@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "dev": "DATA_DIR=./.data PORT=8080 node src/server.js",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",
@@ -18,5 +19,9 @@
   },
   "engines": {
     "pnpm": ">=11"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "marked": "^18.0.14"
   }
 }
