@@ -84,3 +84,24 @@ The technology — AR, 3D graphics, computer vision, motion capture, and AI — 
 But the technology is not the final goal.
 
 The final goal is to make **another person's presence feel tangible inside a virtual space**.
+
+## This Week's Build
+
+The thinking above is written up in README.md's "What Good Means (For Now)"
+section in
+[`03455ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/03455ac).
+
+For a first proof of life, I scoped "virtual avatar" and "trace" down to
+something buildable in a week: an emoji avatar instead of a 3D model, and a
+short text note instead of a recorded video. The shared space itself —
+picking an avatar, leaving a trace, and finding earlier traces still there on
+a later visit — is built in
+[`6f3f655`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6f3f655):
+plain Node + Express, traces stored as JSON on the Fly volume at `/data` so
+they survive restarts and redeploys, and `/readme/` now renders README.md
+through a real Markdown parser rather than the starter's placeholder.
+
+Real-time presence (seeing who else is in the space *right now*, not just the
+traces they left) is deliberately not in this build — that's next week's
+crit, "All at once," and doing it properly needs its own design pass rather
+than bolting it on here.
