@@ -8,6 +8,9 @@ I’d like to explain the idea through my personal experience.
 
 One of my favorite virtual K-pop groups is **PLAVE**, a virtual boy band from South Korea.
 
+<img width="1600" height="1280" alt="image" src="https://github.com/user-attachments/assets/b8abffe6-0d4e-4a99-afdc-ae46070a569a" />
+
+
 One of the great things about PLAVE is how actively they communicate with their fans through text messages, voice messages, chats, and live streams. However, there is one limitation compared to real-life K-pop artists: **it is difficult for virtual artists to easily record and share casual selfie videos or moments from their daily lives.**
 
 And this is not only a challenge for PLAVE.
