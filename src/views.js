@@ -9,118 +9,151 @@ export function escapeHtml(s) {
     .replaceAll("'", "&#39;");
 }
 
-function timeAgo(iso) {
+export function timeAgo(iso) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
-function layout(title, body) {
+const SOURCE_LABEL = { avatar: "🎭 virtual human", camera: "📷 camera", upload: "⬆️ upload" };
+
+function layout(title, body, { bodyClass = "", scripts = [] } = {}) {
   return `<!doctype html>
 <html lang="en-AU">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000" />
     <title>${escapeHtml(title)}</title>
-    <style>
-      :root { color-scheme: light dark; }
-      body {
-        font-family: system-ui, sans-serif;
-        max-width: 40rem;
-        margin: 2rem auto;
-        padding: 0 1rem;
-        line-height: 1.5;
-      }
-      header { margin-bottom: 2rem; }
-      header p { opacity: 0.75; }
-      fieldset { border: 1px solid currentColor; border-radius: 0.5rem; margin: 0 0 2rem; }
-      .avatars { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-      .avatars label { font-size: 1.5rem; cursor: pointer; }
-      textarea, input[type="text"] { width: 100%; font: inherit; box-sizing: border-box; }
-      textarea { resize: vertical; }
-      .trace { display: flex; gap: 0.75rem; padding: 0.75rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
-      .trace .avatar { font-size: 1.75rem; }
-      .trace .meta { opacity: 0.6; font-size: 0.85rem; }
-      .empty { opacity: 0.6; font-style: italic; }
-      nav a { color: inherit; }
-      .here { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; min-height: 2.5rem; margin-bottom: 1.5rem; }
-      .here .person { display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; opacity: 0.85; }
-      .here .person span:first-child { font-size: 1.75rem; }
-      .here .person.me { opacity: 1; font-weight: 600; }
-      .trace.arrived { animation: arrive 1.2s ease-out; }
-      @keyframes arrive { from { background: color-mix(in srgb, currentColor 12%, transparent); } }
-    </style>
+    <link rel="stylesheet" href="/assets/app.css" />
   </head>
-  <body>
+  <body class="${bodyClass}">
     ${body}
+    ${scripts.map((s) => `<script type="module" src="/assets/${s}"></script>`).join("\n    ")}
   </body>
 </html>`;
 }
 
-export function renderHome(traces) {
-  const avatarInputs = AVATARS.map(
-    (a, i) =>
-      `<label><input type="radio" name="avatar" value="${a}" ${i === 0 ? "checked" : ""}/>${a}</label>`,
-  ).join("\n        ");
+function bottomNav(active) {
+  const item = (href, key, icon, label) =>
+    `<a href="${href}" class="${active === key ? "active" : ""}"${active === key ? ' aria-current="page"' : ""}>${icon}<span>${label}</span></a>`;
+  return `<nav class="bottom-nav" aria-label="main">
+    ${item("/", "home", '<span class="icon" aria-hidden="true">⌂</span>', "Home")}
+    <a href="/create" class="create" aria-label="create a video"><span aria-hidden="true">＋</span></a>
+    ${item("/readme/", "about", '<span class="icon" aria-hidden="true">ⓘ</span>', "About")}
+  </nav>`;
+}
 
-  const traceItems = traces.length
-    ? traces
-        .map(
-          (t) => `<li class="trace">
-          <span class="avatar">${t.avatar}</span>
-          <span>
-            <strong>${escapeHtml(t.name || "someone")}</strong>
-            <div>${escapeHtml(t.text)}</div>
-            <div class="meta">${timeAgo(t.createdAt)}</div>
-          </span>
-        </li>`,
-        )
-        .join("\n")
-    : `<li class="empty">no one has left a trace yet &mdash; be the first</li>`;
+export function renderClip(v) {
+  return `<article class="clip" id="v-${escapeHtml(v.id)}" data-id="${escapeHtml(v.id)}">
+      <video src="${escapeHtml(v.src)}" type="${escapeHtml(v.type)}" loop muted playsinline preload="metadata"></video>
+      <div class="rail">
+        <span class="creator" title="${escapeHtml(v.name || "someone")}">${escapeHtml(v.avatar)}</span>
+        <button class="like" type="button" aria-pressed="false" aria-label="like"><span class="icon" aria-hidden="true">♥</span><span class="count">${v.likes}</span></button>
+        <button class="comments-open" type="button" aria-label="comments"><span class="icon" aria-hidden="true">💬</span><span class="count">${v.comments.length}</span></button>
+        <button class="share" type="button" aria-label="share"><span class="icon" aria-hidden="true">↗</span><span class="count">Share</span></button>
+      </div>
+      <div class="info">
+        <strong>@${escapeHtml(v.name || "someone")}</strong>
+        ${v.caption ? `<p>${escapeHtml(v.caption)}</p>` : ""}
+        <span class="meta">${SOURCE_LABEL[v.source] ?? ""} · ${timeAgo(v.createdAt)}</span>
+      </div>
+      <script type="application/json" class="comment-data">${JSON.stringify(v.comments).replaceAll("<", "\\u003c")}</script>
+    </article>`;
+}
+
+export function renderFeed(videos) {
+  const clips = videos.length
+    ? videos.map(renderClip).join("\n    ")
+    : `<article class="clip empty-feed"><div><p class="big">🎭</p><p>No videos yet.</p><p><a href="/create" class="pill">Make the first one</a></p></div></article>`;
 
   return layout(
-    "the space",
-    `<header>
-      <h1>the space</h1>
-      <p>a small shared space. pick an avatar, leave a trace of a moment, and come back later to see who else was here. <nav><a href="/readme/">what good means here</a></nav></p>
+    "For You",
+    `<header class="top-bar">
+      <span class="tab active">For You</span>
+      <div class="here" id="here" aria-live="polite" title="here right now"></div>
     </header>
-    <section aria-labelledby="here-heading">
-      <h2 id="here-heading" style="font-size: 1rem; margin-bottom: 0.5rem;">here right now</h2>
-      <div class="here" id="here" aria-live="polite"><span class="empty">just you, until the page connects</span></div>
-    </section>
-    <form method="POST" action="/traces" id="leave">
-      <fieldset>
-        <legend>leave a trace</legend>
-        <div class="avatars">
-          ${avatarInputs}
+    <main class="feed" id="feed">
+    ${clips}
+    </main>
+    <button class="sound" id="sound" type="button" aria-pressed="false">🔇 Tap for sound</button>
+    <dialog class="sheet" id="comments">
+      <header><strong><span id="comment-count">0</span> comments</strong><button type="button" class="close" aria-label="close">✕</button></header>
+      <ul id="comment-list"></ul>
+      <form id="comment-form">
+        <input name="text" maxlength="200" placeholder="Add a comment…" autocomplete="off" required />
+        <button type="submit">Post</button>
+      </form>
+    </dialog>
+    <div class="toast" id="toast" role="status"></div>
+    ${bottomNav("home")}`,
+    { bodyClass: "app", scripts: ["feed.js"] },
+  );
+}
+
+export function renderCreate() {
+  const avatarOptions = AVATARS.map((a) => `<option value="${a}">${a}</option>`).join("");
+  return layout(
+    "Create",
+    `<header class="top-bar studio-bar">
+      <a href="/" class="close" aria-label="back to the feed">✕</a>
+      <div class="modes" role="tablist">
+        <button type="button" role="tab" data-mode="avatar" aria-selected="true">Avatar</button>
+        <button type="button" role="tab" data-mode="camera" aria-selected="false">Camera</button>
+        <button type="button" role="tab" data-mode="upload" aria-selected="false">Upload</button>
+      </div>
+    </header>
+    <main class="studio">
+      <div class="stage">
+        <canvas id="canvas" width="540" height="960"></canvas>
+        <video id="preview" loop playsinline hidden></video>
+        <div class="stage-message" id="stage-message">Allow the camera to start</div>
+        <div class="timer" id="timer" hidden>0:00</div>
+      </div>
+
+      <div class="controls" id="live-controls">
+        <div class="pickers" id="avatar-pickers">
+          <label>Look <select id="look"></select></label>
+          <label>World <select id="world"></select></label>
         </div>
-        <p>
-          <label>name (optional)<br/>
-          <input type="text" name="name" maxlength="40" placeholder="someone" /></label>
-        </p>
-        <p>
-          <label>what's happening right now?<br/>
-          <textarea name="text" maxlength="280" rows="2" required></textarea></label>
-        </p>
-        <button type="submit">leave it here</button>
-      </fieldset>
-    </form>
-    <ul id="traces" style="list-style: none; padding: 0;">
-      ${traceItems}
-    </ul>
-    <script type="module" src="/assets/space.js"></script>`,
+        <button type="button" class="record" id="record" aria-label="start recording" disabled><span></span></button>
+        <p class="hint" id="privacy-hint">Avatar mode: your face is tracked on this device. Only the avatar is recorded.</p>
+      </div>
+
+      <div class="controls" id="upload-controls" hidden>
+        <label class="pill file">Choose a video<input type="file" id="file" accept="video/*" /></label>
+        <p class="hint">Up to 25 MB.</p>
+      </div>
+
+      <form class="post" id="post" hidden>
+        <input name="caption" maxlength="150" placeholder="Describe your video…" autocomplete="off" />
+        <div class="row">
+          <select name="avatar" aria-label="your emoji">${avatarOptions}</select>
+          <input name="name" maxlength="40" placeholder="your name" autocomplete="nickname" />
+        </div>
+        <div class="row">
+          <button type="button" class="pill ghost" id="retake">Retake</button>
+          <button type="submit" class="pill">Post</button>
+        </div>
+        <p class="hint" id="post-status" role="status"></p>
+      </form>
+    </main>`,
+    { bodyClass: "app studio-page", scripts: ["create.js"] },
   );
 }
 
 export function renderReadmePage(html) {
   return layout(
-    "about this space",
-    `<nav><a href="/">&larr; back to the space</a></nav>
-    ${html}`,
+    "About",
+    `<main class="readme">
+      <nav><a href="/">&larr; back to the feed</a></nav>
+      ${html}
+    </main>
+    ${bottomNav("about")}`,
+    { bodyClass: "doc" },
   );
 }
