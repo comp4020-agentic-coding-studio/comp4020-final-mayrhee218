@@ -1,5 +1,6 @@
 import express from "express";
 import { addTrace, listTraces } from "./store.js";
+import { broadcastTrace, attachLive } from "./live.js";
 import { renderReadme } from "./readme.js";
 import { AVATARS, renderHome, renderReadmePage } from "./views.js";
 
@@ -16,7 +17,7 @@ app.post("/traces", async (req, res) => {
   const text = String(req.body.text ?? "").trim().slice(0, 280);
 
   if (text) {
-    await addTrace({ avatar, name, text, createdAt: new Date().toISOString() });
+    broadcastTrace(await addTrace({ avatar, name, text, createdAt: new Date().toISOString() }));
   }
   res.redirect("/");
 });
@@ -26,6 +27,7 @@ app.get("/readme/", async (_req, res) => {
 });
 
 const port = process.env.PORT ?? 8080;
-app.listen(port, "0.0.0.0", () => {
+const server = app.listen(port, "0.0.0.0", () => {
   console.log(`listening on 0.0.0.0:${port}`);
 });
+attachLive(server);
