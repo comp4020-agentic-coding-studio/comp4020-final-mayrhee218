@@ -48,6 +48,12 @@ function layout(title, body) {
       .trace .meta { opacity: 0.6; font-size: 0.85rem; }
       .empty { opacity: 0.6; font-style: italic; }
       nav a { color: inherit; }
+      .here { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; min-height: 2.5rem; margin-bottom: 1.5rem; }
+      .here .person { display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; opacity: 0.85; }
+      .here .person span:first-child { font-size: 1.75rem; }
+      .here .person.me { opacity: 1; font-weight: 600; }
+      .trace.arrived { animation: arrive 1.2s ease-out; }
+      @keyframes arrive { from { background: color-mix(in srgb, currentColor 12%, transparent); } }
     </style>
   </head>
   <body>
@@ -83,7 +89,11 @@ export function renderHome(traces) {
       <h1>the space</h1>
       <p>a small shared space. pick an avatar, leave a trace of a moment, and come back later to see who else was here. <nav><a href="/readme/">what good means here</a></nav></p>
     </header>
-    <form method="POST" action="/traces">
+    <section aria-labelledby="here-heading">
+      <h2 id="here-heading" style="font-size: 1rem; margin-bottom: 0.5rem;">here right now</h2>
+      <div class="here" id="here" aria-live="polite"><span class="empty">just you, until the page connects</span></div>
+    </section>
+    <form method="POST" action="/traces" id="leave">
       <fieldset>
         <legend>leave a trace</legend>
         <div class="avatars">
@@ -100,9 +110,10 @@ export function renderHome(traces) {
         <button type="submit">leave it here</button>
       </fieldset>
     </form>
-    <ul style="list-style: none; padding: 0;">
+    <ul id="traces" style="list-style: none; padding: 0;">
       ${traceItems}
-    </ul>`,
+    </ul>
+    <script type="module" src="/assets/space.js"></script>`,
   );
 }
 

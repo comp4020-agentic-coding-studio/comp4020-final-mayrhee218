@@ -26,6 +26,8 @@ export function attachLive(server) {
   wss = new WebSocketServer({ server, path: "/live", maxPayload: 4 * 1024 });
 
   wss.on("connection", (ws) => {
+    const id = randomUUID();
+    ws.send(JSON.stringify({ type: "welcome", id }));
     // Late arrivals see who's already here before they introduce themselves.
     ws.send(JSON.stringify({ type: "presence", people: [...people.values()] }));
 
@@ -38,7 +40,7 @@ export function attachLive(server) {
       }
       if (msg?.type !== "hello") return;
       people.set(ws, {
-        id: people.get(ws)?.id ?? randomUUID(),
+        id,
         avatar: AVATARS.includes(msg.avatar) ? msg.avatar : AVATARS[0],
         name: String(msg.name ?? "").trim().slice(0, 40),
       });

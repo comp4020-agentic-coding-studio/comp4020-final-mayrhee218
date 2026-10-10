@@ -1,4 +1,5 @@
 import express from "express";
+import { fileURLToPath } from "node:url";
 import { addTrace, listTraces } from "./store.js";
 import { broadcastTrace, attachLive } from "./live.js";
 import { renderReadme } from "./readme.js";
@@ -6,6 +7,7 @@ import { AVATARS, renderHome, renderReadmePage } from "./views.js";
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
+app.use("/assets", express.static(fileURLToPath(new URL("./public/", import.meta.url))));
 
 app.get("/", async (_req, res) => {
   res.type("html").send(renderHome(await listTraces()));
@@ -19,6 +21,9 @@ app.post("/traces", async (req, res) => {
   if (text) {
     broadcastTrace(await addTrace({ avatar, name, text, createdAt: new Date().toISOString() }));
   }
+  // The page posts with fetch and shows the trace when /live echoes it back;
+  // without JavaScript the form still works and simply reloads.
+  if (req.get("accept")?.includes("application/json")) return res.status(204).end();
   res.redirect("/");
 });
 
