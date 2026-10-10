@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { AVATARS } from "./views.js";
 
-// Everyone with the space open holds a socket at /live. Presence lives only in
+// Everyone with the app open holds a socket at /live. Presence lives only in
 // memory: it's "who is here right now", so a restart rightly forgets it.
 const people = new Map(); // ws -> { id, avatar, name }
 let wss = null;
@@ -18,9 +18,7 @@ function broadcastPresence() {
   broadcast({ type: "presence", people: [...people.values()] });
 }
 
-export function broadcastTrace(trace) {
-  broadcast({ type: "trace", trace });
-}
+export { broadcast };
 
 export function attachLive(server) {
   wss = new WebSocketServer({ server, path: "/live", maxPayload: 4 * 1024 });

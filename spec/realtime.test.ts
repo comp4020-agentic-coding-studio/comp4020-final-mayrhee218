@@ -52,7 +52,7 @@ const unique = () => `spec-${Date.now()}-${Math.random().toString(36).slice(2, 8
 
 async function post(caption: string, body: Uint8Array = clip, type = "video/webm"): Promise<Response> {
   const query = new URLSearchParams({ caption, name: "poster", avatar: "🐧", source: "upload" });
-  return fetch(new URL(`/videos?${query}`, baseUrl), { method: "POST", headers: { "content-type": type }, body });
+  return fetch(new URL(`/videos?${query}`, baseUrl), { method: "POST", headers: { "content-type": type }, body: new Blob([new Uint8Array(body)]) });
 }
 
 it("a video posted by one person reaches another open session without a reload, and plays", async () => {
