@@ -1,107 +1,139 @@
 # Process
 
-## What I Learned from "Home-Cooked Apps"
+## Where This Started (Crit 8)
 
-I read Robin Sloan's writing about **"home-cooked apps."**
+My idea has always been a short-form video platform for virtual humans: the
+gap I noticed with PLAVE is that virtual artists can't easily share a casual
+selfie moment the way real artists can.
 
-What I found interesting was the idea that software does not always need to be designed for millions of anonymous users. A small, specific group of people can sometimes benefit more from software that is designed around their particular needs, relationships, and context.
+In crit 8 I read Robin Sloan's writing on **"home-cooked apps"** and let it
+pull me the other way. I described the project as **a shared kitchen** —
+between a home-cooked app for a few people and a platform built for millions —
+and deliberately left out feeds, likes, follower counts and discovery. That
+position is in
+[`bc7f2ad`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/bc7f2ad),
+the first definition of good in
+[`03455ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/03455ac),
+and the first proof of life — an emoji avatar, a text "trace", stored on the
+Fly volume — in
+[`6f3f655`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6f3f655).
 
-I agree with this philosophy in terms of **human connection and intentional design**. However, I do not want my project to remain at the scale of a tool made for only one person or a very small group.
+That scoping got something real deployed in a week. But a page of text notes
+wasn't the product I actually want to make.
 
-My goal is to create a web experience that can support **multiple users interacting with each other in real time**.
+## Changing Direction: An Open Video Platform (Crit 9)
 
-## Not Home Cooking, but a Shared Kitchen
+This week I went back to the original idea and redefined good in
+[`662b986`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/662b986):
 
-I think of my project as something between a home-cooked app and a commercial restaurant.
+> a **social short-form video platform for virtual creators**, where anyone can
+> easily record, share, and watch videos through their virtual avatars.
 
-A home-cooked meal is personal, specific, and made for a small number of people. That is valuable, but it is difficult to serve many people at the same time.
+The PLAVE gap is about *videos reaching people*. A casual selfie only matters
+if someone sees it, and a feed people can watch and react to is how short-form
+video does that. So the feed, likes and comments I had left out are now part of
+the core experience rather than something to avoid.
 
-A commercial restaurant, on the other hand, has a kitchen designed to serve many people. It has systems and infrastructure that allow multiple people to have an experience at the same time.
+What I kept from crit 8 is the scale discipline: build the smallest version of
+each piece that proves the experience, not the whole platform.
 
-My project takes inspiration from the **personal and human qualities of home-cooked software**, while building the infrastructure needed for a **shared, multi-user, real-time experience**.
+## How I Directed the Work
 
-The goal is not to make another large social media platform optimized for maximum growth. Instead, I want to build a shared virtual space where multiple people can be present, leave traces of themselves, and encounter each other's presence.
+I started the week by giving the agent a long architecture prompt for the full
+platform: Next.js, PostgreSQL, Redis queues, S3 and a CDN, FFmpeg transcoding,
+GPU workers for 2D-to-3D, a monorepo with separate services.
 
-## What This Means for My Project
+The agent checked it against the course's fixed deploy setup in `fly.toml`
+before building anything, and much of it doesn't fit: **one shared-CPU machine
+with 256 MB of memory, and one 1 GB volume at `/data`** — no separate database
+server, no object storage, no GPU. It also pointed out that the prompt
+contradicted my crit 8 README.
 
-This changes how I think about the idea of a virtual-human platform.
+The agent then misread my answer as dropping the TikTok direction. I corrected
+it: I wanted the TikTok-like open video platform, scaled to fit. From there my
+decisions were:
 
-My original idea was closer to TikTok: anyone could create a virtual-human video, upload it, and share it with a large audience.
+- **All three ways to make a video:** record as an avatar, record with the
+  camera, or upload a file.
+- **Likes, comments and a live "N here" count** as the social layer for now;
+  follows and profiles wait until there are accounts.
+- **Real-time first:** get the crit 9 contract deployed and green before
+  anything else.
 
-After thinking about the small-web perspective, I realized that **scale itself should not be the definition of success**.
+## What I Built, and Why This Way
 
-For this project, I am more interested in questions such as:
+Each part of the original prompt, mapped onto what this deploy can run:
 
-* Can several people exist in the same virtual space?
-* Can they leave traces of their presence?
-* Can someone return later and discover that another person was there?
-* Does the space feel more alive because other people have interacted with it?
-* Can the experience remain casual and unscripted rather than becoming another performance-oriented social media platform?
+| The prompt asked for | What I built | Why |
+| --- | --- | --- |
+| Facial tracking + avatar rendering | MediaPipe Face Landmarker **in the browser**, driving a 2D character drawn on a canvas (head turn/tilt, blinks, brows, mouth, smile) | No GPU server needed, low latency, and **camera frames never leave the device** |
+| Recording pipeline | `canvas.captureStream()` + `MediaRecorder`, vertical 540×960, mic audio | Only the drawn avatar is recorded in avatar mode, not the face |
+| Virtual environments | 4 drawn worlds, including an AR world with a blurred camera behind the avatar | A stand-in for uploaded or AI-generated 3D environments |
+| S3 + presigned uploads | Uploads **streamed straight to `/data`**, never held in memory; 25 MB per clip, 850 MB in total | The machine has 256 MB, and the volume is the only storage |
+| Malware/type validation | A file is accepted only if its first bytes are WebM, MP4 or QuickTime, whatever it claims to be | Uploaded files are untrusted |
+| PostgreSQL | One JSON file on `/data`, with serialized writes | No database server is allowed in the course setup |
+| TikTok-style feed | Full-screen swipe feed, autoplay for the clip on screen, the next one preloaded, a right-hand rail, a comments sheet | The experience the README promises |
+| WebSocket for live updates | A `ws` WebSocket at `/live` on the same server | Real-time without WebRTC: nothing here is live media |
 
-This means that the important unit is not the number of views, likes, or followers.
+The server side is
+[`67d13e5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/67d13e5)
+and the UI and studio are
+[`f98972b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/f98972b).
 
-The important unit is **presence**.
+## Real-Time, Red to Green
 
-## What I Am Intentionally Leaving Out
+Crit 9 requires that a change one person makes reaches every other open session
+within about a second, with no reload. I held the agent to that with a test
+in `spec/realtime.test.ts` that runs against the deployed app, written **before**
+the code:
 
-To keep the project focused, I am not trying to reproduce every feature of a social media platform.
+1. Red:
+   [`867c2ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/867c2ac)
+   — two clients; a trace left by one must reach the other within 1 s, and
+   presence must update when someone arrives or leaves.
+2. Green:
+   [`56b56fa`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/56b56fa)
+   (WebSocket server) and
+   [`3e542f5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/3e542f5)
+   (live page).
+3. When the project became a video platform, I changed the contract instead of
+   keeping a test for a feature that no longer existed. Red again:
+   [`2ce9411`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/2ce9411)
+   — a posted video, a like and a comment must each reach other sessions within
+   1 s, and a file that only *claims* to be a video must be refused.
+4. Green again with the video platform commits above.
 
-For now, I am leaving out:
+## Corrections Along the Way
 
-* Algorithmic feeds
-* Likes and popularity scores
-* Follower systems
-* Large-scale content discovery
-* Engagement metrics
-* Complex user profiles
+- The tests were green, but the studio was broken in a real browser: a
+  JavaScript ordering bug stopped the create page before it drew anything. The
+  spec only checks the server, so it couldn't see this. A scripted Chrome
+  walkthrough caught it — record an avatar clip, post it, watch it arrive in
+  another tab — and it was fixed before the UI commit.
+- The studio said "only the avatar is recorded", which isn't true in the AR
+  world, where your blurred room is recorded too. The hint now changes with the
+  world you pick.
+- Test runs post clips, so the live app is only checked with tests that don't
+  post anything; the posting tests run in CI against throwaway data, so the feed
+  my pod sees isn't full of test videos.
 
-These features could potentially be added in the future, but they are not necessary to prove the core idea.
+## Known Limits
 
-Instead, I want to focus on a small shared environment where people can use their virtual avatars, interact with the space, and leave something behind for others to discover.
+- **No accounts.** Names are self-chosen, likes are counted per device, and
+  anyone with the link can post. There's no delete, report or moderation yet.
+  That's acceptable for a crit, but not for an open platform.
+- **The avatar is 2D and face-only.** There's no 3D model, VRM upload or body
+  tracking yet, and webcam tracking is not professional motion capture.
+- **No AI environments or 2D-to-3D conversion.** Those need GPU infrastructure
+  this deploy doesn't have.
+- **No transcoding.** Clips play in the format they were recorded in (WebM, or
+  MP4 from Safari).
+- **Face tracking has only been tested with a fake camera so far.** It needs
+  testing on real phones and webcams.
 
-## The Current Definition of "Good"
+## Next
 
-For this project, I define a good experience as:
-
-> **A small group of people can enter the same virtual space, express themselves through their virtual avatars, and leave traces that make the space feel alive when someone else visits later.**
-
-This definition allows me to test the most important part of the concept without needing to build an entire social media platform.
-
-My long-term vision can still grow toward a much larger multi-user platform. But for this project, I want to prove that **real-time presence and human traces can make a virtual world feel meaningful before adding the mechanics of conventional social media.**
-
-## Why This Direction Matters
-
-The virtual-human concept is ultimately about allowing people to express themselves in another form.
-
-That expression does not necessarily need to happen through polished, highly produced content.
-
-I am interested in the opposite: **small, casual, everyday moments**.
-
-Someone walks into the virtual space, records a short moment from their day, leaves something behind, and another person encounters it later.
-
-The technology — AR, 3D graphics, computer vision, motion capture, and AI — is what makes this possible.
-
-But the technology is not the final goal.
-
-The final goal is to make **another person's presence feel tangible inside a virtual space**.
-
-## This Week's Build
-
-The thinking above is written up in README.md's "What Good Means (For Now)"
-section in
-[`03455ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/03455ac).
-
-For a first proof of life, I scoped "virtual avatar" and "trace" down to
-something buildable in a week: an emoji avatar instead of a 3D model, and a
-short text note instead of a recorded video. The shared space itself —
-picking an avatar, leaving a trace, and finding earlier traces still there on
-a later visit — is built in
-[`6f3f655`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6f3f655):
-plain Node + Express, traces stored as JSON on the Fly volume at `/data` so
-they survive restarts and redeploys, and `/readme/` now renders README.md
-through a real Markdown parser rather than the starter's placeholder.
-
-Real-time presence (seeing who else is in the space *right now*, not just the
-traces they left) is deliberately not in this build — that's next week's
-crit, "All at once," and doing it properly needs its own design pass rather
-than bolting it on here.
+- Decide and write down how presence should work when several people use the
+  app at once, with the options I considered and what my choice costs.
+- Crit 10, and toward A3: a 3D avatar, and the account and moderation basics an
+  open platform needs.
