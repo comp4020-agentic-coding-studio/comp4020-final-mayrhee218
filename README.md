@@ -47,15 +47,8 @@ Just choose or create your virtual human, record your daily life, and share it w
 
 ## What Good Means (For Now)
 
-PLAVE's fans don't love them because of scale — millions watch, but what keeps people there is the voice message, the chat reply, the moment that feels like it was made for one person. That's the piece I'm actually building first, not the platform.
+A successful version of this project is a **social short-form video platform for virtual creators**, where anyone can easily record, share, and watch videos through their virtual avatars.
 
-So for this version, good doesn't mean "works for anyone." It means:
+Users can choose or upload an avatar, record moments from their daily lives as a virtual human, and share them in a video feed where others can watch and interact with their content. The experience should feel as simple and accessible as using TikTok, without requiring expensive equipment, complicated software, or advanced technical knowledge.
 
-- **It's co-presence, not broadcast.** The app should feel more alive because a specific friend was just here, not because a stranger with more followers posted today. No feed to scroll, no follower count — just whoever is actually sharing this space with you.
-- **A trace is a person, not a metric.** Finding someone's clip waiting for you should feel like finding a voice message from them, not like finding a post. What matters is that it's *still there*, not how many people saw it.
-- **It protects the casual selfie, not the performance.** PLAVE's gap is that it's hard to be off-stage. Good means the easiest thing to make here is a rough, unplanned trace — not a produced video.
-- **It deliberately leaves out what a platform adds first:** public discovery, likes, comments, rankings, follower counts. Those are what turn a small space into a feed, and a feed isn't what this week is testing.
-
-*(I'm still reading into the small-web / friend-scale software thinking the brief points at — Robin Sloan's writing on "home-cooked apps" is where I'm starting — and I'll cite what actually shaped this here and discuss my position in PROCESS.md once I've properly read it, not just skimmed it.)*
-
-This is a first version of "good," and it's meant to be rough — it'll move as the app does.
+For now, the priority is to demonstrate the core experience: **creating a video with a virtual avatar, sharing it with others, and experiencing a social platform where virtual humans can express themselves naturally.**
