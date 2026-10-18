@@ -1,6 +1,6 @@
 # 4. Backgrounds: a room photo is 2D, AI is optional, worlds are 3D
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-18
 
 ## Context
