@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const DATA_DIR = process.env.DATA_DIR ?? "/data";
@@ -57,13 +57,13 @@ export async function addVideo(video) {
   return toPublic(stored);
 }
 
-export async function setLike(id, clientId, liked) {
+export async function setLike(id, by, liked) {
   await ensureLoaded();
   const video = videos.find((v) => v.id === id);
   if (!video) return null;
-  const has = video.likedBy.includes(clientId);
-  if (liked && !has) video.likedBy.push(clientId);
-  if (!liked && has) video.likedBy.splice(video.likedBy.indexOf(clientId), 1);
+  const has = video.likedBy.includes(by);
+  if (liked && !has) video.likedBy.push(by);
+  if (!liked && has) video.likedBy.splice(video.likedBy.indexOf(by), 1);
   if (liked !== has) await save();
   return video.likedBy.length;
 }
@@ -76,4 +76,33 @@ export async function addComment(id, comment) {
   video.comments.push(stored);
   await save();
   return stored;
+}
+
+// The rules for who may remove what live here, beside the data, so every
+// route goes through the same check. See docs/decisions/0002-who-may-change-what.md.
+// Each returns "missing", "forbidden" or the removed record.
+export async function removeVideo(id, by) {
+  await ensureLoaded();
+  const index = videos.findIndex((v) => v.id === id);
+  if (index === -1) return "missing";
+  const video = videos[index];
+  if (!video.by || video.by !== by) return "forbidden";
+  videos.splice(index, 1);
+  await save();
+  await rm(path.join(VIDEOS_DIR, video.file), { force: true });
+  return video;
+}
+
+export async function removeComment(videoId, commentId, by) {
+  await ensureLoaded();
+  const video = videos.find((v) => v.id === videoId);
+  const index = video?.comments.findIndex((c) => c.id === commentId) ?? -1;
+  if (index === -1) return "missing";
+  const comment = video.comments[index];
+  const wroteIt = comment.by && comment.by === by;
+  const ownsVideo = video.by && video.by === by;
+  if (!wroteIt && !ownsVideo) return "forbidden";
+  video.comments.splice(index, 1);
+  await save();
+  return comment;
 }

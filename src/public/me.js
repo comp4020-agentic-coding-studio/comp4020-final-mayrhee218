@@ -1,5 +1,6 @@
-// Who this device is, and its line to everyone else. No accounts yet: a name,
-// an emoji and a random id live in this browser only.
+// Who this device is, and its line to everyone else. No accounts: a name and
+// an emoji live in this browser. Who you *are* to the server is its identity
+// cookie (src/identity.js), which this script can't read or forge.
 const KEY = "the-space:me";
 const AVATARS = ["🙂", "🦊", "🐧", "🤖", "👾", "🌙", "🌻", "🐙"];
 
@@ -11,7 +12,6 @@ function load() {
   return {
     avatar: AVATARS.includes(saved.avatar) ? saved.avatar : AVATARS[Math.floor(Math.random() * AVATARS.length)],
     name: typeof saved.name === "string" ? saved.name : "",
-    clientId: saved.clientId ?? crypto.randomUUID(),
   };
 }
 

@@ -22,6 +22,7 @@ const rememberLikes = () => {
 
 let muted = true;
 let myId = null;
+let myBy = null; // this browser's public handle, from the server
 let openClip = null;
 const comments = new Map(); // video id -> comment[]
 
@@ -91,6 +92,9 @@ function wire(clip) {
   likeButton.addEventListener("click", () => setLiked(clip, !liked.has(id)));
   clip.querySelector(".comments-open").addEventListener("click", () => openComments(clip));
   clip.querySelector(".share").addEventListener("click", () => share(clip));
+  const deleteButton = clip.querySelector(".delete");
+  deleteButton.hidden = !myBy || clip.dataset.by !== myBy;
+  deleteButton.addEventListener("click", () => deleteVideo(clip));
   visibility.observe(clip);
 }
 
@@ -107,9 +111,22 @@ async function setLiked(clip, value) {
   const res = await fetch(`/videos/${encodeURIComponent(id)}/like`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ clientId: me.clientId, liked: value }),
+    body: JSON.stringify({ liked: value }),
   }).catch(() => null);
   if (!res?.ok) showToast("couldn't save that like");
+}
+
+async function deleteVideo(clip) {
+  if (!confirm("Delete this video for everyone?")) return;
+  const res = await fetch(`/videos/${encodeURIComponent(clip.dataset.id)}`, { method: "DELETE" }).catch(() => null);
+  if (!res?.ok) showToast((await res?.json().catch(() => null))?.error ?? "couldn't delete that video");
+}
+
+async function deleteComment(c) {
+  if (!openClip) return;
+  const url = `/videos/${encodeURIComponent(openClip.dataset.id)}/comments/${encodeURIComponent(c.id)}`;
+  const res = await fetch(url, { method: "DELETE" }).catch(() => null);
+  if (!res?.ok) showToast((await res?.json().catch(() => null))?.error ?? "couldn't delete that comment");
 }
 
 async function share(clip) {
@@ -128,6 +145,14 @@ function commentItem(c, arrived = false) {
   const body = el("div");
   body.append(el("div", "name", c.name || "someone"), el("p", "", c.text));
   li.append(el("span", "who", c.avatar), body);
+  // Mirrors the server's rule: the writer, or the video's poster.
+  if (myBy && (c.by === myBy || openClip?.dataset.by === myBy)) {
+    const remove = el("button", "remove", "✕");
+    remove.type = "button";
+    remove.setAttribute("aria-label", "delete this comment");
+    remove.addEventListener("click", () => deleteComment(c));
+    li.append(remove);
+  }
   return li;
 }
 
@@ -204,13 +229,14 @@ const SOURCE_LABEL = { avatar: "🎭 virtual human", camera: "📷 camera", uplo
 
 // Mirrors renderClip in src/views.js, for clips that arrive live.
 function clipMarkup(v) {
-  return `<article class="clip" id="v-${esc(v.id)}" data-id="${esc(v.id)}">
+  return `<article class="clip" id="v-${esc(v.id)}" data-id="${esc(v.id)}" data-by="${esc(v.by ?? "")}">
     <video src="${esc(v.src)}" loop muted playsinline preload="auto"></video>
     <div class="rail">
       <span class="creator" title="${esc(v.name || "someone")}">${esc(v.avatar)}</span>
       <button class="like" type="button" aria-pressed="false" aria-label="like"><span class="icon" aria-hidden="true">♥</span><span class="count">${Number(v.likes)}</span></button>
       <button class="comments-open" type="button" aria-label="comments"><span class="icon" aria-hidden="true">💬</span><span class="count">${v.comments.length}</span></button>
       <button class="share" type="button" aria-label="share"><span class="icon" aria-hidden="true">↗</span><span class="count">Share</span></button>
+      <button class="delete" type="button" aria-label="delete this video" hidden><span class="icon" aria-hidden="true">🗑</span><span class="count">Delete</span></button>
     </div>
     <div class="info">
       <strong>@${esc(v.name || "someone")}</strong>
@@ -223,7 +249,28 @@ function clipMarkup(v) {
 
 connectLive(
   (msg) => {
-    if (msg.type === "welcome") myId = msg.id;
+    if (msg.type === "welcome") {
+      myId = msg.id;
+      myBy = msg.by;
+      for (const clip of feed.querySelectorAll(".clip")) clip.querySelector(".delete").hidden = clip.dataset.by !== myBy;
+    }
+    if (msg.type === "video-removed") {
+      const clip = clipFor(msg.id);
+      if (clip) {
+        visibility.unobserve(clip);
+        clip.remove();
+        comments.delete(msg.id);
+        if (openClip === clip) sheet.close();
+        if (!msg.by || msg.by !== myBy) showToast("a video was removed by its poster");
+      }
+    }
+    if (msg.type === "comment-removed") {
+      const list = (comments.get(msg.id) ?? []).filter((c) => c.id !== msg.commentId);
+      comments.set(msg.id, list);
+      const count = clipFor(msg.id)?.querySelector(".comments-open .count");
+      if (count) bump(count, list.length);
+      if (openClip?.dataset.id === msg.id) renderComments();
+    }
     if (msg.type === "presence") renderPresence(msg.people);
     if (msg.type === "video") addVideo(msg.video);
     if (msg.type === "likes") {

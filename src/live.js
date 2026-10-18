@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
+import { handleFromCookie } from "./identity.js";
 import { AVATARS } from "./views.js";
 
 // Everyone with the app open holds a socket at /live. Presence lives only in
@@ -23,9 +24,12 @@ export { broadcast };
 export function attachLive(server) {
   wss = new WebSocketServer({ server, path: "/live", maxPayload: 4 * 1024 });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
     const id = randomUUID();
-    ws.send(JSON.stringify({ type: "welcome", id }));
+    // The upgrade carries the page's cookie, so the page learns its own handle
+    // here and can offer delete on what it owns. The server still decides.
+    const by = handleFromCookie(req.headers.cookie);
+    ws.send(JSON.stringify({ type: "welcome", id, by }));
     // Late arrivals see who's already here before they introduce themselves.
     ws.send(JSON.stringify({ type: "presence", people: [...people.values()] }));
 

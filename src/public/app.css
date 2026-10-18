@@ -140,6 +140,7 @@ button, input, select { font: inherit; }
 .sheet ul { list-style: none; margin: 0; padding: 0 1rem; overflow-y: auto; flex: 1; min-height: 8rem; }
 .sheet li { display: flex; gap: 0.7rem; padding: 0.6rem 0; }
 .sheet li .who { font-size: 1.6rem; }
+.sheet li .remove { margin-left: auto; background: none; border: 0; color: #8a8b91; font-size: 1rem; cursor: pointer; padding: 0.25rem 0.5rem; }
 .sheet li .name { font-size: 0.8rem; color: #8a8b91; }
 .sheet li p { margin: 0.1rem 0 0; overflow-wrap: anywhere; }
 .sheet li.arrived { animation: arrive-light 1.2s ease-out; }

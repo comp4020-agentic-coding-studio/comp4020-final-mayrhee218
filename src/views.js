@@ -49,13 +49,14 @@ function bottomNav(active) {
 }
 
 export function renderClip(v) {
-  return `<article class="clip" id="v-${escapeHtml(v.id)}" data-id="${escapeHtml(v.id)}">
+  return `<article class="clip" id="v-${escapeHtml(v.id)}" data-id="${escapeHtml(v.id)}" data-by="${escapeHtml(v.by ?? "")}">
       <video src="${escapeHtml(v.src)}" type="${escapeHtml(v.type)}" loop muted playsinline preload="metadata"></video>
       <div class="rail">
         <span class="creator" title="${escapeHtml(v.name || "someone")}">${escapeHtml(v.avatar)}</span>
         <button class="like" type="button" aria-pressed="false" aria-label="like"><span class="icon" aria-hidden="true">♥</span><span class="count">${v.likes}</span></button>
         <button class="comments-open" type="button" aria-label="comments"><span class="icon" aria-hidden="true">💬</span><span class="count">${v.comments.length}</span></button>
         <button class="share" type="button" aria-label="share"><span class="icon" aria-hidden="true">↗</span><span class="count">Share</span></button>
+        <button class="delete" type="button" aria-label="delete this video" hidden><span class="icon" aria-hidden="true">🗑</span><span class="count">Delete</span></button>
       </div>
       <div class="info">
         <strong>@${escapeHtml(v.name || "someone")}</strong>

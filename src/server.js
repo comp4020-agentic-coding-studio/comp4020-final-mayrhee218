@@ -1,8 +1,19 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
+import { identify } from "./identity.js";
 import { attachLive, broadcast } from "./live.js";
 import { renderReadme } from "./readme.js";
-import { VIDEOS_DIR, addComment, addVideo, ensureLoaded, listVideos, setLike, storedBytes } from "./store.js";
+import {
+  VIDEOS_DIR,
+  addComment,
+  addVideo,
+  ensureLoaded,
+  listVideos,
+  removeComment,
+  removeVideo,
+  setLike,
+  storedBytes,
+} from "./store.js";
 import { MAX_BYTES, UploadError, receiveVideo } from "./upload.js";
 import { AVATARS, renderCreate, renderFeed, renderReadmePage } from "./views.js";
 
@@ -11,9 +22,14 @@ const STORAGE_BUDGET = 850 * 1024 * 1024;
 const SOURCES = ["avatar", "camera", "upload"];
 
 const app = express();
+app.set("trust proxy", true);
 app.use("/assets", express.static(fileURLToPath(new URL("./public/", import.meta.url))));
 // Clip names are random and never reused, so browsers can keep them forever.
 app.use("/media", express.static(VIDEOS_DIR, { immutable: true, maxAge: "30d" }));
+
+// Everything below here knows who is asking: req.by is the handle of this
+// browser, set from its cookie (src/identity.js), never from the request body.
+app.use(identify);
 
 const person = (body) => ({
   avatar: AVATARS.includes(body?.avatar) ? body.avatar : AVATARS[0],
@@ -40,6 +56,7 @@ app.post("/videos", async (req, res) => {
     const video = await addVideo({
       ...stored,
       ...person(req.query),
+      by: req.by,
       caption: String(req.query.caption ?? "").trim().slice(0, 150),
       source: SOURCES.includes(req.query.source) ? req.query.source : "upload",
     });
@@ -52,9 +69,7 @@ app.post("/videos", async (req, res) => {
 });
 
 app.post("/videos/:id/like", express.json(), async (req, res) => {
-  const clientId = String(req.body?.clientId ?? "").slice(0, 64);
-  if (!clientId) return res.status(400).json({ error: "missing clientId" });
-  const likes = await setLike(req.params.id, clientId, Boolean(req.body.liked));
+  const likes = await setLike(req.params.id, req.by, Boolean(req.body?.liked));
   if (likes === null) return res.status(404).json({ error: "no such video" });
   broadcast({ type: "likes", id: req.params.id, likes });
   res.json({ likes });
@@ -63,10 +78,29 @@ app.post("/videos/:id/like", express.json(), async (req, res) => {
 app.post("/videos/:id/comments", express.json(), async (req, res) => {
   const text = String(req.body?.text ?? "").trim().slice(0, 200);
   if (!text) return res.status(400).json({ error: "a comment needs some text" });
-  const comment = await addComment(req.params.id, { ...person(req.body), text });
+  const comment = await addComment(req.params.id, { ...person(req.body), by: req.by, text });
   if (!comment) return res.status(404).json({ error: "no such video" });
   broadcast({ type: "comment", id: req.params.id, comment });
   res.status(201).json(comment);
+});
+
+const refuse = (res, result, what) =>
+  result === "missing"
+    ? res.status(404).json({ error: `no such ${what}` })
+    : res.status(403).json({ error: `that ${what} isn't yours to delete` });
+
+app.delete("/videos/:id", async (req, res) => {
+  const result = await removeVideo(req.params.id, req.by);
+  if (typeof result === "string") return refuse(res, result, "video");
+  broadcast({ type: "video-removed", id: req.params.id, by: req.by });
+  res.status(204).end();
+});
+
+app.delete("/videos/:id/comments/:commentId", async (req, res) => {
+  const result = await removeComment(req.params.id, req.params.commentId, req.by);
+  if (typeof result === "string") return refuse(res, result, "comment");
+  broadcast({ type: "comment-removed", id: req.params.id, commentId: req.params.commentId });
+  res.status(204).end();
 });
 
 app.get("/readme/", async (_req, res) => {
