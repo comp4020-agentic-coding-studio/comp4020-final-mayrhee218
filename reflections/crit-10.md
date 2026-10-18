@@ -18,10 +18,9 @@ a delete button on Mia's clip, a CSS bug no server test could see.
 **What did this work change about who I want to be as a software developer?**
 
 I want to treat what I can't see as part of the product. Last week I learned
-that green tests aren't the same as a working page. This week the lesson was
-that a working page isn't the same as a trustworthy one: everything looked
-right in the browser while the server would have believed anyone. I also
-caught myself breaking my own rule, running tests that post clips against the
-live feed, and it was the logs that showed me. I want to build so that the
-system can tell me what happened, rather than relying on me to remember.
-[TODO: rewrite this in your own words. It should say what *you* noticed.]
+that green tests aren't the same as a working page. This week a working page
+wasn't a trustworthy one either: everything looked right in the browser while
+the server would have believed anyone. I also found my feeds filled with red
+test clips, because the agent had run tests that post videos against the live
+app, which my own crit 9 rule said not to do. I want to direct the agent by
+what I see in the real app and its logs, not only by what it reports back.
