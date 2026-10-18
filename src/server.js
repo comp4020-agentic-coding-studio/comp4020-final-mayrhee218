@@ -165,7 +165,9 @@ app.get("/avatar-files/:id", async (req, res) => {
   const file = await modelFile(req.params.id, req.by);
   if (!file) return res.status(404).json({ error: "no such avatar" });
   res.set("cache-control", "private, max-age=86400");
-  res.type("model/gltf-binary").sendFile(file);
+  // The path is built from the stored record, never the request, so the dev
+  // data dir (./.data) being a dot-directory is no reason to refuse it.
+  res.type("model/gltf-binary").sendFile(file, { dotfiles: "allow" });
 });
 
 app.delete("/avatars/:id", async (req, res) => {

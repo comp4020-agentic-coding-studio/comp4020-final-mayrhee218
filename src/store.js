@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export const DATA_DIR = process.env.DATA_DIR ?? "/data";
+// Resolved, so a relative DATA_DIR (pnpm dev uses ./.data) still gives
+// absolute paths: res.sendFile refuses anything else.
+export const DATA_DIR = path.resolve(process.env.DATA_DIR ?? "/data");
 export const VIDEOS_DIR = path.join(DATA_DIR, "videos");
 const VIDEOS_FILE = path.join(DATA_DIR, "videos.json");
 
