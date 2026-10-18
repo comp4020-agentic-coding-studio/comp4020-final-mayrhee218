@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { handleFromCookie } from "./identity.js";
+import { act, remember } from "./log.js";
 import { AVATARS } from "./views.js";
 
 // Everyone with the app open holds a socket at /live. Presence lives only in
@@ -41,16 +42,23 @@ export function attachLive(server) {
         return;
       }
       if (msg?.type !== "hello") return;
-      people.set(ws, {
+      const first = !people.has(ws);
+      const person = {
         id,
         avatar: AVATARS.includes(msg.avatar) ? msg.avatar : AVATARS[0],
         name: String(msg.name ?? "").trim().slice(0, 40),
-      });
+      };
+      people.set(ws, person);
+      remember(by, person);
+      act(by, first ? `arrived (${people.size} here)` : "changed their name or avatar");
       broadcastPresence();
     });
 
     ws.on("close", () => {
-      if (people.delete(ws)) broadcastPresence();
+      if (people.delete(ws)) {
+        act(by, `left (${people.size} here)`);
+        broadcastPresence();
+      }
     });
   });
 

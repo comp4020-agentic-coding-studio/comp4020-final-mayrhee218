@@ -39,6 +39,17 @@ export function toPublic(v) {
   return { ...rest, src: `/media/${file}`, likes: likedBy.length };
 }
 
+// Who posted a video, for log lines; null if it's gone or predates owners.
+export function ownerOf(id) {
+  return videos.find((v) => v.id === id)?.by ?? null;
+}
+
+// Everyone who has posted or commented, with the name they last used.
+export async function knownPeople() {
+  await ensureLoaded();
+  return videos.flatMap((v) => [v, ...v.comments]).filter((x) => x.by);
+}
+
 export async function listVideos() {
   await ensureLoaded();
   return [...videos].reverse().map(toPublic);
