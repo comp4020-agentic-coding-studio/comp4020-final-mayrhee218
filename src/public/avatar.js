@@ -6,7 +6,10 @@ const MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
 
-export const WORLDS = ["Dusk room", "Neon street", "Cloud sky", "My room (AR)"];
+// "Live camera (shows you)" draws the real camera, blurred, behind the avatar:
+// it records you, so it's named for what it does.
+export const LIVE_CAMERA = "Live camera (shows you)";
+export const WORLDS = ["Dusk room", "Neon street", "Cloud sky", LIVE_CAMERA];
 
 let landmarker = null;
 export async function loadTracker() {
@@ -76,9 +79,10 @@ function idle(t) {
 }
 
 function drawWorld(ctx, world, w, h, t, camera) {
-  if (world === "My room (AR)" && camera?.readyState >= 2) {
+  if (world === LIVE_CAMERA && camera?.readyState >= 2) {
     // Camera behind the character, cropped to fill and mirrored, softened so
-    // the avatar reads as the subject.
+    // the avatar reads as the subject. The blur does not hide a person: your
+    // body and face are in these pixels, and they are recorded.
     const vw = camera.videoWidth, vh = camera.videoHeight;
     const s = Math.max(w / vw, h / vh);
     ctx.save();

@@ -1,4 +1,4 @@
-import { WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
+import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
 import { me, save } from "./me.js";
 
 const MAX_SECONDS = 30;
@@ -173,8 +173,8 @@ function updateHint() {
   privacyHint.textContent =
     mode === "camera"
       ? "Camera mode: records what your camera sees."
-      : worldSelect.value === "My room (AR)"
-        ? "AR world: a blurred view of your room is recorded behind the avatar. Your face is still tracked on this device only."
+      : worldSelect.value === LIVE_CAMERA
+        ? "Live camera: your real camera, blurred, is recorded behind the avatar. You, your face and your room can still be recognised in the clip."
         : "Avatar mode: your face is tracked on this device. Only the avatar is recorded.";
 }
 worldSelect.addEventListener("change", updateHint);
