@@ -1,16 +1,13 @@
-// The virtual human: a 2D character drawn on a canvas and driven by face
-// tracking. MediaPipe runs here in the browser, so camera frames never leave
-// the device; only the drawn character is recorded.
+// The virtual human: a 3D VRM character driven by face tracking, drawn onto a
+// 2D canvas over a world. MediaPipe runs here in the browser, so camera frames
+// never leave the device; only the drawn character is recorded.
 const MEDIAPIPE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0";
 const MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
-export const LOOKS = {
-  Mochi: { skin: "#ffe0cc", hair: "#4b2a63", iris: "#8a5cf6", blush: "#ff9fb2", top: "#ffffff" },
-  Neon: { skin: "#f6d3c0", hair: "#14e0d6", iris: "#ff2f88", blush: "#ff7aa8", top: "#1d1d2b" },
-  Sunny: { skin: "#f3c7a3", hair: "#f2b33d", iris: "#3a8f5c", blush: "#f08a74", top: "#ff6b4a" },
-  Midnight: { skin: "#fbe8de", hair: "#1c1f3a", iris: "#3d7bff", blush: "#f7a1b5", top: "#3a2f6b" },
-};
+// The avatars on offer, by name, from src/public/models.
+export const AVATARS = { "Cool Banana": "CoolBanana.vrm", Hotdog: "Hotdog.vrm", Mushy: "Mushy.vrm" };
+export const DEFAULT_AVATAR = "Cool Banana";
 
 export const WORLDS = ["Dusk room", "Neon street", "Cloud sky", "My room (AR)"];
 
@@ -163,132 +160,134 @@ function drawWorld(ctx, world, w, h, t, camera) {
   ctx.fillRect(0, h * 0.8, w, h * 0.2);
 }
 
-function drawCharacter(ctx, look, s, w, h) {
-  const cx = w * (0.5 + (s.x - 0.5) * 0.5);
-  const cy = h * (0.42 + (s.y - 0.45) * 0.4);
-  const r = 120 * s.scale;
-  const yawShift = s.yaw * r * 0.55;
-  const pitchShift = s.pitch * r * 0.5;
+// The character itself: a VRM model (CC0, by Polygonal Mind) rendered with
+// three.js into its own WebGL canvas, then drawn over the world. Everything is
+// loaded on first use, like MediaPipe above, so a CDN hiccup only costs the
+// avatar mode: camera and upload keep working.
+let stage = null; // Promise of the three.js setup, made once
+let three = null; // that setup, once it has resolved
+const loading = new Map(); // avatar name -> Promise of { vrm, centre, frame }
+const ready = new Map(); // avatar name -> { vrm, centre, frame } once loaded
+const failed = new Set();
+let shown = null;
+let lastT = null;
 
-  // shoulders stay upright and only drift a little with the head
-  ctx.fillStyle = look.top;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + r * 2.25, r * 1.5, r * 0.95, 0, Math.PI, 0);
-  ctx.lineTo(cx + r * 1.5, h);
-  ctx.lineTo(cx - r * 1.5, h);
-  ctx.fill();
-  ctx.fillStyle = look.skin;
-  ctx.fillRect(cx - r * 0.25, cy + r * 0.8, r * 0.5, r * 0.6);
+async function setup() {
+  const THREE = await import("three");
+  const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+  const { VRMLoaderPlugin, VRMUtils } = await import("@pixiv/three-vrm");
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(540, 960, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+  sun.position.set(1, 1.5, 2);
+  scene.add(sun);
+  const camera = new THREE.PerspectiveCamera(30, 540 / 960, 0.05, 50);
+  const loader = new GLTFLoader();
+  loader.register((parser) => new VRMLoaderPlugin(parser));
+  three = { THREE, VRMUtils, renderer, scene, camera, loader };
+  return three;
+}
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(s.roll);
+// Starts loading an avatar if it isn't already; resolves when it can be drawn.
+export function loadAvatar(name) {
+  if (!AVATARS[name]) name = DEFAULT_AVATAR;
+  if (!loading.has(name)) {
+    failed.delete(name);
+    const promise = (async () => {
+      const { THREE, VRMUtils, loader } = await (stage ??= setup());
+      const gltf = await loader.loadAsync(`/assets/models/${AVATARS[name]}`);
+      const vrm = gltf.userData.vrm;
+      VRMUtils.rotateVRM0(vrm); // these are VRM 0.0 models, which face away
+      const bone = (b) => vrm.humanoid.getNormalizedBoneNode(b);
+      // Out of the T-pose: arms rest at the sides.
+      if (bone("leftUpperArm")) bone("leftUpperArm").rotation.z = 1.2;
+      if (bone("rightUpperArm")) bone("rightUpperArm").rotation.z = -1.2;
+      vrm.update(0);
+      vrm.scene.updateMatrixWorld(true);
+      // These characters are all head: frame the whole model, a little above
+      // centre so it stands clear of the controls at the bottom.
+      const box = new THREE.Box3().setFromObject(vrm.scene);
+      const frame = (box.max.y - box.min.y) * 1.25;
+      const centre = box.getCenter(new THREE.Vector3()).y - frame * 0.08;
+      const loaded = { vrm, centre, frame };
+      ready.set(name, loaded);
+      return loaded;
+    })();
+    promise.catch(() => {
+      loading.delete(name);
+      failed.add(name);
+    });
+    loading.set(name, promise);
+  }
+  return loading.get(name);
+}
 
-  // back hair
-  ctx.fillStyle = look.hair;
-  ctx.beginPath();
-  ctx.ellipse(-yawShift * 0.2, r * 0.15, r * 1.12, r * 1.25, 0, 0, Math.PI * 2);
-  ctx.fill();
+function say(ctx, text, w, h) {
+  ctx.fillStyle = "rgb(0 0 0 / 0.45)";
+  ctx.fillRect(w * 0.2, h * 0.45, w * 0.6, 56);
+  ctx.fillStyle = "#fff";
+  ctx.font = "600 22px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(text, w / 2, h * 0.45 + 36);
+}
 
-  // face
-  ctx.fillStyle = look.skin;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 0.92, r * 1.02, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // features follow yaw and pitch so the head reads as turning
-  ctx.translate(yawShift, pitchShift);
-  const eyeY = -r * 0.05;
-  const eyeX = r * 0.36;
-  for (const [side, blink] of [[-1, s.blinkL], [1, s.blinkR]]) {
-    const open = clamp(1 - blink * 1.25, 0.06, 1);
-    ctx.save();
-    ctx.translate(side * eyeX, eyeY);
-    ctx.scale(1, open);
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.2, r * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.iris;
-    ctx.beginPath();
-    ctx.ellipse(s.yaw * r * 0.12, r * 0.03, r * 0.14, r * 0.19, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#1a1030";
-    ctx.beginPath();
-    ctx.ellipse(s.yaw * r * 0.12, r * 0.05, r * 0.07, r * 0.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(s.yaw * r * 0.12 - r * 0.05, -r * 0.05, r * 0.045, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    if (open < 0.2) {
-      ctx.strokeStyle = "#3a2440";
-      ctx.lineWidth = r * 0.04;
-      ctx.beginPath();
-      ctx.arc(side * eyeX, eyeY - r * 0.04, r * 0.16, Math.PI * 0.15, Math.PI * 0.85);
-      ctx.stroke();
+function drawCharacter(ctx, name, s, w, h, t) {
+  const avatar = ready.get(name);
+  if (!avatar || !three) {
+    if (failed.has(name)) say(ctx, "Avatar couldn't load", w, h);
+    else {
+      loadAvatar(name);
+      say(ctx, "Loading avatar…", w, h);
     }
+    return;
+  }
+  const { THREE, renderer, scene, camera } = three;
+  const { vrm, centre, frame } = avatar;
+  if (shown !== vrm) {
+    if (shown) scene.remove(shown.scene);
+    scene.add(vrm.scene);
+    shown = vrm;
   }
 
-  // brows
-  ctx.strokeStyle = look.hair;
-  ctx.lineWidth = r * 0.06;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1]) {
-    const by = eyeY - r * 0.36 - s.brows * r * 0.14;
-    ctx.beginPath();
-    ctx.moveTo(side * (eyeX - r * 0.16), by + r * 0.02);
-    ctx.quadraticCurveTo(side * eyeX, by - r * 0.06, side * (eyeX + r * 0.16), by + r * 0.04);
-    ctx.stroke();
-  }
+  // Head turn, nod and tilt, shared between neck and head so it bends
+  // naturally. The pose is already mirrored, so it moves like a reflection.
+  const yaw = s.yaw * 1.3;
+  const pitch = s.pitch * 1.4;
+  const roll = -s.roll;
+  const neck = vrm.humanoid.getNormalizedBoneNode("neck");
+  const headBone = vrm.humanoid.getNormalizedBoneNode("head");
+  const share = neck ? 0.6 : 1;
+  headBone.rotation.set(pitch * share, yaw * share, roll * share);
+  neck?.rotation.set(pitch * 0.4, yaw * 0.4, roll * 0.4);
 
-  // blush
-  ctx.fillStyle = look.blush;
-  ctx.globalAlpha = 0.45 + s.smile * 0.35;
-  for (const side of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(side * r * 0.55, r * 0.3, r * 0.14, r * 0.08, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
+  // These models carry blink and the a/e/i/o/u mouth shapes, no smile.
+  const em = vrm.expressionManager;
+  em?.setValue("blink", clamp(Math.max(s.blinkL, s.blinkR) * 1.2, 0, 1));
+  em?.setValue("aa", clamp(s.jaw * 1.6, 0, 1));
 
-  // mouth: opens with the jaw, curves with a smile
-  const mouthY = r * 0.48;
-  const mw = r * (0.18 + s.smile * 0.12);
-  const mh = r * (0.02 + s.jaw * 0.38);
-  ctx.fillStyle = "#7a2440";
-  ctx.beginPath();
-  ctx.moveTo(-mw, mouthY);
-  ctx.quadraticCurveTo(0, mouthY + mh + s.smile * r * 0.12, mw, mouthY);
-  ctx.quadraticCurveTo(0, mouthY - mh * 0.3 + s.smile * r * 0.04, -mw, mouthY);
-  ctx.fill();
-  if (s.jaw > 0.25) {
-    ctx.fillStyle = "#ff8fa8";
-    ctx.beginPath();
-    ctx.ellipse(0, mouthY + mh * 0.55, mw * 0.5, mh * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const dt = lastT === null ? 0 : clamp((t - lastT) / 1000, 0, 0.1);
+  lastT = t;
+  vrm.update(dt);
 
-  // fringe last, so it sits over the forehead
-  ctx.translate(-yawShift * 0.5, -pitchShift * 0.5);
-  ctx.fillStyle = look.hair;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.98, -r * 0.1);
-  ctx.quadraticCurveTo(-r * 0.95, -r * 1.15, 0, -r * 1.12);
-  ctx.quadraticCurveTo(r * 0.95, -r * 1.15, r * 0.98, -r * 0.1);
-  for (let i = 4; i >= 0; i--) {
-    const x = -r * 0.9 + (i / 4) * r * 1.8;
-    ctx.quadraticCurveTo(x + r * 0.2, -r * 0.55, x, -r * 0.35 - (i % 2) * r * 0.1);
-  }
-  ctx.fill();
-  ctx.restore();
+  // Follow the face around the frame and in and out, like the 2D one did.
+  const viewW = frame * (w / h);
+  vrm.scene.position.x = (s.x - 0.5) * 0.5 * viewW;
+  vrm.scene.position.y = -(s.y - 0.45) * 0.4 * frame;
+  const distance = frame / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / clamp(s.scale, 0.7, 1.4);
+  camera.position.set(0, centre, distance);
+  camera.lookAt(0, centre, 0);
+
+  renderer.render(scene, camera);
+  ctx.drawImage(renderer.domElement, 0, 0, w, h);
 }
 
 export function drawAvatarScene(ctx, { look, world, camera, t, pose: tracked }) {
   const { width: w, height: h } = ctx.canvas;
   drawWorld(ctx, world, w, h, t, camera);
-  drawCharacter(ctx, LOOKS[look] ?? LOOKS.Mochi, tracked?.found ? tracked : idle(t), w, h);
+  drawCharacter(ctx, look, tracked?.found ? tracked : idle(t), w, h, t);
 }
 
 // Camera mode: the raw camera, cropped to 9:16 and mirrored like a selfie.

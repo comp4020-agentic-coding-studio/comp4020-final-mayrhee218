@@ -21,7 +21,7 @@ export function timeAgo(iso) {
 
 const SOURCE_LABEL = { avatar: "🎭 virtual human", camera: "📷 camera", upload: "⬆️ upload" };
 
-function layout(title, body, { bodyClass = "", scripts = [] } = {}) {
+function layout(title, body, { bodyClass = "", scripts = [], head = "" } = {}) {
   return `<!doctype html>
 <html lang="en-AU">
   <head>
@@ -30,6 +30,7 @@ function layout(title, body, { bodyClass = "", scripts = [] } = {}) {
     <meta name="theme-color" content="#000" />
     <title>${escapeHtml(title)}</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    ${head}
   </head>
   <body class="${bodyClass}">
     ${body}
@@ -96,6 +97,16 @@ export function renderFeed(videos) {
   );
 }
 
+// three-vrm imports "three" by bare name, so the studio maps it to a pinned CDN
+// build. Loaded only when the avatar is first drawn (src/public/avatar.js).
+const STUDIO_IMPORTS = `<script type="importmap">${JSON.stringify({
+  imports: {
+    three: "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js",
+  },
+})}</script>`;
+
 export function renderCreate() {
   const avatarOptions = AVATARS.map((a) => `<option value="${a}">${a}</option>`).join("");
   return layout(
@@ -118,7 +129,7 @@ export function renderCreate() {
 
       <div class="controls" id="live-controls">
         <div class="pickers" id="avatar-pickers">
-          <label>Look <select id="look"></select></label>
+          <label>Avatar <select id="look"></select></label>
           <label>World <select id="world"></select></label>
         </div>
         <button type="button" class="record" id="record" aria-label="start recording" disabled><span></span></button>
@@ -143,7 +154,7 @@ export function renderCreate() {
         <p class="hint" id="post-status" role="status"></p>
       </form>
     </main>`,
-    { bodyClass: "app studio-page", scripts: ["create.js"] },
+    { bodyClass: "app studio-page", scripts: ["create.js"], head: STUDIO_IMPORTS },
   );
 }
 

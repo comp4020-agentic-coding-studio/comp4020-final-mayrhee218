@@ -1,4 +1,4 @@
-import { LOOKS, WORLDS, drawAvatarScene, drawCameraScene, loadTracker, track } from "./avatar.js";
+import { AVATARS, WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track } from "./avatar.js";
 import { me, save } from "./me.js";
 
 const MAX_SECONDS = 30;
@@ -20,7 +20,10 @@ const postStatus = document.getElementById("post-status");
 const lookSelect = document.getElementById("look");
 const worldSelect = document.getElementById("world");
 
-lookSelect.append(...Object.keys(LOOKS).map((l) => new Option(l, l)));
+lookSelect.append(...Object.keys(AVATARS).map((a) => new Option(a, a)));
+// Fetch the model while the camera permission prompt is up.
+loadAvatar(lookSelect.value).catch(() => {});
+lookSelect.addEventListener("change", () => loadAvatar(lookSelect.value).catch(() => {}));
 worldSelect.append(...WORLDS.map((w) => new Option(w, w)));
 postForm.elements.namedItem("avatar").value = me.avatar;
 postForm.elements.namedItem("name").value = me.name;
