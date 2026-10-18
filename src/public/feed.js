@@ -252,7 +252,9 @@ connectLive(
     if (msg.type === "welcome") {
       myId = msg.id;
       myBy = msg.by;
-      for (const clip of feed.querySelectorAll(".clip")) clip.querySelector(".delete").hidden = clip.dataset.by !== myBy;
+      for (const button of feed.querySelectorAll(".clip .delete")) {
+        button.hidden = button.closest(".clip").dataset.by !== myBy;
+      }
     }
     if (msg.type === "video-removed") {
       const clip = clipFor(msg.id);

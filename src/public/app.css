@@ -80,6 +80,8 @@ button, input, select { font: inherit; }
   background: none; border: 0; color: var(--fg); cursor: pointer; padding: 0;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
 }
+/* display: flex above would otherwise beat the hidden attribute */
+.rail button[hidden] { display: none; }
 .rail .icon { font-size: 1.9rem; line-height: 1; }
 .rail .count { font-size: 0.78rem; font-weight: 600; }
 .rail .like[aria-pressed="true"] .icon { color: var(--accent); }
