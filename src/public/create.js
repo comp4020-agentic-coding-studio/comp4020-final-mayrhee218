@@ -1,5 +1,5 @@
 import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, faceIn, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
-import { DEFAULT_STYLE, STYLES, portrait, stylise } from "./room.js";
+import { DEFAULT_STYLE, STYLES, portrait, stylise, toJpeg } from "./room.js";
 import { me, save } from "./me.js";
 
 const MAX_SECONDS = 30;
@@ -151,7 +151,7 @@ function restyleRoom() {
   room.filtered = stylise(room.photo, roomStyle.value);
   roomEl.status.textContent =
     room.ai?.style === roomStyle.value
-      ? `Showing the AI-restyled room (${room.ai.provider}).`
+      ? `Showing the room as returned by ${room.ai.provider}.`
       : "Showing your room with an on-device colour filter (not AI). The photo hasn't left this device.";
 }
 
@@ -209,6 +209,60 @@ roomEl.file.addEventListener("change", async () => {
     useRoomPhoto(await createImageBitmap(file));
   } catch {
     roomEl.status.textContent = "That file isn't a picture this browser can open.";
+  }
+});
+
+// AI restyling is offered only if the server has a provider; otherwise the
+// button never appears and the on-device filter is all there is.
+let aiProvider = { available: false };
+fetch("/rooms/provider")
+  .then((r) => r.json())
+  .then((info) => {
+    aiProvider = info;
+    roomEl.ai.hidden = !info.available;
+  })
+  .catch(() => {});
+
+roomEl.ai.addEventListener("click", () => {
+  if (!room.photo) return;
+  roomEl.consentText.textContent =
+    `Your room photo (not the filtered one) will be sent to our server and then to ${aiProvider.name}, an external AI service, ` +
+    `to redraw it in the ${STYLES[roomStyle.value].name} style. ${aiProvider.costNote} ` +
+    "The original photo is deleted from our server once the restyle finishes; the result is kept for you only. " +
+    "Check that nobody is in the photo first.";
+  roomEl.consent.hidden = false;
+});
+roomEl.consentNo.addEventListener("click", () => (roomEl.consent.hidden = true));
+
+roomEl.consentYes.addEventListener("click", async () => {
+  roomEl.consent.hidden = true;
+  const style = roomStyle.value;
+  roomEl.ai.disabled = true;
+  roomEl.status.textContent = "Sending your photo…";
+  try {
+    const res = await fetch(`/rooms?${new URLSearchParams({ style, consent: "yes" })}`, {
+      method: "POST",
+      headers: { "content-type": "image/jpeg" },
+      body: await toJpeg(room.photo),
+    });
+    let job = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(job.error ?? "the restyle couldn't start");
+    const started = Date.now();
+    while (job.status === "queued" || job.status === "working") {
+      roomEl.status.textContent = `Restyling with ${job.provider}… ${Math.round((Date.now() - started) / 1000)} s`;
+      await new Promise((r) => setTimeout(r, 1500));
+      job = await (await fetch(`/rooms/${job.id}`)).json();
+    }
+    if (job.status !== "done") throw new Error(job.error ?? "the restyle failed");
+    const image = new Image();
+    image.src = job.url;
+    await image.decode();
+    room.ai = { style, image, provider: job.provider };
+    restyleRoom();
+  } catch (err) {
+    roomEl.status.textContent = `${err.message}. Your on-device filtered room is still in use.`;
+  } finally {
+    roomEl.ai.disabled = false;
   }
 });
 

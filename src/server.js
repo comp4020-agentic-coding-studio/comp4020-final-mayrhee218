@@ -5,6 +5,7 @@ import { identify } from "./identity.js";
 import { attachLive, broadcast } from "./live.js";
 import { act, quote, remember, shortId, who } from "./log.js";
 import { renderReadme } from "./readme.js";
+import { MAX_ROOM_BYTES, RoomError, getRoom, listRooms, providerInfo, removeRoom, roomFile, startRoom } from "./rooms.js";
 import {
   VIDEOS_DIR,
   addComment,
@@ -110,6 +111,52 @@ app.post("/videos/:id/comments", express.json(), async (req, res) => {
   res.status(201).json(comment);
 });
 
+// AI room restyling (src/rooms.js). Like avatars, everything here answers only
+// for the browser that made it.
+app.get("/rooms/provider", (_req, res) => {
+  res.json(providerInfo());
+});
+
+app.get("/rooms", async (req, res) => {
+  res.json(await listRooms(req.by));
+});
+
+app.post("/rooms", express.raw({ type: () => true, limit: MAX_ROOM_BYTES }), async (req, res) => {
+  try {
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const job = await startRoom(req.by, body, req.query, (j) => {
+      const what = { queued: "asked for", working: "is waiting on", done: "got", failed: "FAILED" }[j.status];
+      act(req.by, `${what} an AI room restyle ${shortId(j.id)} [${j.style}${j.error ? `: ${j.error}` : ""}]`);
+    });
+    res.status(202).json(job);
+  } catch (err) {
+    if (!(err instanceof RoomError)) throw err;
+    act(req.by, `REFUSED AI room restyle: ${err.message}`);
+    res.status(err.status).json({ error: err.message });
+  }
+});
+
+app.get("/rooms/:id", async (req, res) => {
+  const job = await getRoom(req.params.id, req.by);
+  if (!job) return res.status(404).json({ error: "no such room" });
+  res.json(job);
+});
+
+app.get("/room-files/:id", async (req, res) => {
+  const found = await roomFile(req.params.id, req.by);
+  if (!found) return res.status(404).json({ error: "no such room" });
+  res.set("cache-control", "private, max-age=86400");
+  res.type(found.type).sendFile(found.file, { dotfiles: "allow" });
+});
+
+app.delete("/rooms/:id", async (req, res) => {
+  const result = await removeRoom(req.params.id, req.by);
+  if (result === "busy") return res.status(409).json({ error: "that restyle is still running" });
+  if (typeof result === "string") return refuse(res, result, "room");
+  act(req.by, `deleted AI room ${shortId(req.params.id)}`);
+  res.status(204).end();
+});
+
 const refuse = (res, result, what) =>
   result === "missing"
     ? res.status(404).json({ error: `no such ${what}` })
@@ -180,6 +227,12 @@ app.delete("/avatars/:id", async (req, res) => {
 
 app.get("/readme/", async (_req, res) => {
   res.type("html").send(renderReadmePage(await renderReadme()));
+});
+
+// A body over a route's limit (express.raw) answers as JSON, like the rest.
+app.use((err, _req, res, next) => {
+  if (err?.type === "entity.too.large") return res.status(413).json({ error: "that picture is too big" });
+  next(err);
 });
 
 await ensureLoaded();

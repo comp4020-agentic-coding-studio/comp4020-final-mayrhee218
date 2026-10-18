@@ -65,6 +65,7 @@ export async function storedBytes() {
   try {
     models = JSON.parse(await readFile(path.join(DATA_DIR, "models.json"), "utf8"));
   } catch {}
+  // AI room backgrounds are capped per person and small; they aren't counted.
   return [...videos, ...models].reduce((sum, x) => sum + (x.size ?? 0), 0);
 }
 
