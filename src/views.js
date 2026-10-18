@@ -137,6 +137,11 @@ export function renderCreate() {
           <button type="button" class="pill ghost small" id="model-delete" hidden>Delete this avatar</button>
         </div>
         <p class="hint" id="model-status" role="status"></p>
+        <div class="avatar-upload" id="world-upload">
+          <label class="pill ghost small">Upload 3D world (.glb)<input type="file" id="world-file" accept=".glb" /></label>
+          <button type="button" class="pill ghost small" id="world-delete" hidden>Delete this world</button>
+        </div>
+        <p class="hint" id="world-status" role="status"></p>
         <details class="room" id="room">
           <summary>Transform my room <span class="tag">2D photo</span></summary>
           <p class="hint">A still photo of your room, restyled to suit your avatar and shown behind it. It's a flat picture, not a 3D world. Step out of frame first: anyone in the photo ends up in your video.</p>

@@ -195,7 +195,7 @@ async function setup() {
   const sun = new THREE.DirectionalLight(0xffffff, 1.8);
   sun.position.set(1, 1.5, 2);
   scene.add(sun);
-  const camera = new THREE.PerspectiveCamera(30, 540 / 960, 0.05, 50);
+  const camera = new THREE.PerspectiveCamera(30, 540 / 960, 0.05, 500);
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
   three = { THREE, VRMUtils, renderer, scene, camera, loader };
@@ -253,6 +253,51 @@ export function loadAvatar(url) {
   return loading.get(url);
 }
 
+// A world: an uploaded .glb scene, drawn as real 3D geometry in the same
+// scene as the avatar, so the avatar stands inside it. Unlike a room photo,
+// it has depth and the camera sees it in perspective.
+const worldLoading = new Map(); // url -> Promise of { scene, floor, span }
+const worldReady = new Map();
+const worldFailed = new Map();
+let shownWorld = null;
+let worldLights = null;
+
+export function loadWorld(url) {
+  if (!worldLoading.has(url)) {
+    worldFailed.delete(url);
+    const promise = (async () => {
+      if (!webglAvailable) throw new Error("this browser can't draw 3D");
+      const { THREE, loader } = await (stage ??= setup());
+      const gltf = await loader.loadAsync(url);
+      const world = gltf.scene;
+      world.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(world);
+      if (box.isEmpty()) throw new Error("that world has nothing to draw");
+      const size = box.getSize(new THREE.Vector3());
+      const loaded = { scene: world, box, size };
+      worldReady.set(url, loaded);
+      return loaded;
+    })();
+    promise.catch((err) => {
+      worldLoading.delete(url);
+      worldFailed.set(url, err?.message ?? "World couldn't load");
+    });
+    worldLoading.set(url, promise);
+  }
+  return worldLoading.get(url);
+}
+
+// Fits a world around an avatar: its larger floor side becomes about eight
+// avatar-heights wide, its floor sits at the avatar's feet, and its middle
+// is a little behind the avatar, so the portrait camera looks into it.
+function placeWorld(THREE, world, avatarHeight) {
+  const { scene: w, box, size } = world;
+  const scale = (avatarHeight * 8) / Math.max(size.x, size.z, 1e-6);
+  w.scale.setScalar(scale);
+  const centre = box.getCenter(new THREE.Vector3());
+  w.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale - avatarHeight * 1.5);
+}
+
 function say(ctx, text, w, h) {
   ctx.fillStyle = "rgb(0 0 0 / 0.45)";
   ctx.fillRect(w * 0.2, h * 0.45, w * 0.6, 56);
@@ -273,7 +318,7 @@ function express(em, names, value) {
   }
 }
 
-function drawCharacter(ctx, url, s, w, h, t) {
+function drawCharacter(ctx, url, s, w, h, t, worldUrl = null) {
   const avatar = ready.get(url);
   if (!avatar || !three) {
     if (!webglAvailable) say(ctx, "3D isn't available here", w, h);
@@ -291,6 +336,26 @@ function drawCharacter(ctx, url, s, w, h, t) {
     scene.add(model);
     shown = model;
   }
+  const world = worldUrl ? worldReady.get(worldUrl) : null;
+  if (worldUrl && !world && !worldFailed.has(worldUrl)) loadWorld(worldUrl).catch(() => {});
+  const worldScene = world?.scene ?? null;
+  if (shownWorld !== worldScene) {
+    if (shownWorld) scene.remove(shownWorld);
+    if (worldScene) {
+      placeWorld(THREE, world, frame / 1.25);
+      scene.add(worldScene);
+    }
+    shownWorld = worldScene;
+  }
+  // A world gets a sky and a softer key light; the avatar alone needs neither.
+  if (!worldLights) {
+    worldLights = new THREE.HemisphereLight(0xdfefff, 0x6b5a48, 1.1);
+    worldLights.visible = false;
+    scene.add(worldLights);
+  }
+  worldLights.visible = Boolean(worldScene);
+  scene.background = worldScene ? new THREE.Color(0xbfd8f0) : null;
+  scene.fog = worldScene ? new THREE.Fog(0xbfd8f0, frame * 6, frame * 30) : null;
 
   const dt = lastT === null ? 0 : clamp((t - lastT) / 1000, 0, 0.1);
   lastT = t;
@@ -326,8 +391,15 @@ function drawCharacter(ctx, url, s, w, h, t) {
   model.position.y = -(s.y - 0.45) * 0.4 * frame;
   if (!tracked) model.rotation.y = s.yaw * 0.6; // a plain model turns whole
   const distance = frame / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / clamp(s.scale, 0.7, 1.4);
-  camera.position.set(0, centre, distance);
-  camera.lookAt(0, centre, 0);
+  if (worldScene) {
+    // In a world, step back and up a little and look slightly down, so the
+    // floor and room read around the avatar in a portrait frame.
+    camera.position.set(0, centre + frame * 0.25, distance * 1.45);
+    camera.lookAt(0, centre - frame * 0.05, 0);
+  } else {
+    camera.position.set(0, centre, distance);
+    camera.lookAt(0, centre, 0);
+  }
 
   renderer.render(scene, camera);
   ctx.drawImage(renderer.domElement, 0, 0, w, h);
@@ -337,11 +409,17 @@ function drawCharacter(ctx, url, s, w, h, t) {
 // or an upload under /avatar-files/.
 // `backdrop`, if given, is a picture (a canvas or loaded image) drawn instead
 // of a standard world: a room photo, filtered or AI-styled.
-export function drawAvatarScene(ctx, { model, world, backdrop, camera, t, pose: tracked }) {
+// `world3d`, if given, is the URL of an uploaded .glb world, drawn in 3D
+// around the avatar instead of any flat background.
+export function drawAvatarScene(ctx, { model, world, backdrop, world3d, camera, t, pose: tracked }) {
   const { width: w, height: h } = ctx.canvas;
-  if (backdrop) ctx.drawImage(backdrop, 0, 0, w, h);
+  if (world3d) {
+    ctx.fillStyle = "#bfd8f0";
+    ctx.fillRect(0, 0, w, h);
+    if (worldFailed.has(world3d)) say(ctx, "World couldn't load", w, h * 0.3);
+  } else if (backdrop) ctx.drawImage(backdrop, 0, 0, w, h);
   else drawWorld(ctx, world, w, h, t, camera);
-  drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t);
+  drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t, world3d && !worldFailed.has(world3d) ? world3d : null);
 }
 
 // Camera mode: the raw camera, cropped to 9:16 and mirrored like a selfie.

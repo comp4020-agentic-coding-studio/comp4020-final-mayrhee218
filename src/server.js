@@ -17,15 +17,19 @@ import {
   removeComment,
   removeVideo,
   setLike,
-  storedBytes,
+  storedBytes as storedVideoBytes,
 } from "./store.js";
-import { MAX_MODEL_BYTES, listModels, modelFile, ownsModel, receiveModel, removeModel } from "./models.js";
+import { avatars, worlds } from "./models.js";
 import { MAX_BYTES, UploadError, receiveVideo } from "./upload.js";
 import { AVATARS, renderCreate, renderFeed, renderReadmePage } from "./views.js";
 
 // The volume is 1 GB; leave headroom for metadata and a clip mid-upload.
 const STORAGE_BUDGET = 850 * 1024 * 1024;
 const SOURCES = ["avatar", "camera", "upload"];
+// Everything on the volume people put there: clips, avatars and worlds. AI
+// room backgrounds are capped per person and small; they aren't counted.
+const storedBytes = async () =>
+  (await storedVideoBytes()) + (await avatars.totalBytes()) + (await worlds.totalBytes());
 const BUILTIN_MODELS = JSON.parse(
   readFileSync(fileURLToPath(new URL("./public/models/manifest.json", import.meta.url)), "utf8"),
 ).models.map((m) => m.id);
@@ -73,7 +77,7 @@ app.post("/videos", async (req, res) => {
     // only if it's a built-in or one of the poster's own uploads.
     const modelId = String(req.query.avatarModelId ?? "");
     const avatarModelId =
-      BUILTIN_MODELS.includes(modelId) || (modelId && (await ownsModel(modelId, req.by))) ? modelId : undefined;
+      BUILTIN_MODELS.includes(modelId) || (modelId && (await avatars.owns(modelId, req.by))) ? modelId : undefined;
     const video = await addVideo({
       ...(avatarModelId && { avatarModelId }),
       ...stored,
@@ -184,46 +188,57 @@ app.delete("/videos/:id/comments/:commentId", async (req, res) => {
   res.status(204).end();
 });
 
-// Your own 3D avatars. Every route answers only for the browser that uploaded
-// them: there is no way to list, fetch or delete someone else's.
-app.get("/avatars", async (req, res) => {
-  res.json(await listModels(req.by));
-});
+// Your own 3D avatars and worlds. Every route answers only for the browser
+// that uploaded them: there is no way to list, fetch or delete someone else's.
+function ownedRoutes(collection, { list, files, noun, describe }) {
+  app.get(list, async (req, res) => {
+    res.json(await collection.list(req.by));
+  });
 
-app.post("/avatars", async (req, res) => {
-  if (Number(req.get("content-length") ?? 0) > MAX_MODEL_BYTES) {
-    return res.status(413).json({ error: "that model is too big — keep it under 15 MB" });
-  }
-  if ((await storedBytes()) > STORAGE_BUDGET) {
-    return res.status(507).json({ error: "the space is full for now" });
-  }
-  try {
-    const model = await receiveModel(req, req.by, req.query.name);
-    act(req.by, `uploaded avatar ${shortId(model.id)} ${quote(model.name)} [${model.kind}, ${Math.round(model.size / 1024)} KB, face tracking ${model.faceTracking ? "yes" : "no"}]`);
-    res.status(201).json(model);
-  } catch (err) {
-    if (!(err instanceof UploadError)) throw err;
-    act(req.by, `FAILED avatar upload: ${err.message}`);
-    res.status(err.status).json({ error: err.message });
-  }
-});
+  app.post(list, async (req, res) => {
+    if (Number(req.get("content-length") ?? 0) > collection.maxBytes) {
+      return res.status(413).json({ error: `that ${noun} is too big — keep it under ${collection.maxBytes / 1024 / 1024} MB` });
+    }
+    if ((await storedBytes()) > STORAGE_BUDGET) {
+      return res.status(507).json({ error: "the space is full for now" });
+    }
+    try {
+      const item = await collection.receive(req, req.by, req.query.name);
+      act(req.by, `uploaded ${noun} ${shortId(item.id)} ${quote(item.name)} [${describe(item)}]`);
+      res.status(201).json(item);
+    } catch (err) {
+      if (!(err instanceof UploadError)) throw err;
+      act(req.by, `FAILED ${noun} upload: ${err.message}`);
+      res.status(err.status).json({ error: err.message });
+    }
+  });
 
-app.get("/avatar-files/:id", async (req, res) => {
-  const file = await modelFile(req.params.id, req.by);
-  if (!file) return res.status(404).json({ error: "no such avatar" });
-  res.set("cache-control", "private, max-age=86400");
-  // The path is built from the stored record, never the request, so the dev
-  // data dir (./.data) being a dot-directory is no reason to refuse it.
-  res.type("model/gltf-binary").sendFile(file, { dotfiles: "allow" });
-});
+  app.get(`${files}/:id`, async (req, res) => {
+    const file = await collection.file(req.params.id, req.by);
+    if (!file) return res.status(404).json({ error: `no such ${noun}` });
+    res.set("cache-control", "private, max-age=86400");
+    // The path is built from the stored record, never the request, so the dev
+    // data dir (./.data) being a dot-directory is no reason to refuse it.
+    res.type("model/gltf-binary").sendFile(file, { dotfiles: "allow" });
+  });
 
-app.delete("/avatars/:id", async (req, res) => {
-  const result = await removeModel(req.params.id, req.by);
-  if (result === "forbidden") act(req.by, `REFUSED delete avatar ${shortId(req.params.id)}`);
-  if (typeof result === "string") return refuse(res, result, "avatar");
-  act(req.by, `deleted avatar ${shortId(req.params.id)} ${quote(result.name)}`);
-  res.status(204).end();
+  app.delete(`${list}/:id`, async (req, res) => {
+    const result = await collection.remove(req.params.id, req.by);
+    if (result === "forbidden") act(req.by, `REFUSED delete ${noun} ${shortId(req.params.id)}`);
+    if (typeof result === "string") return refuse(res, result, noun);
+    act(req.by, `deleted ${noun} ${shortId(req.params.id)} ${quote(result.name)}`);
+    res.status(204).end();
+  });
+}
+
+const kb = (item) => `${Math.round(item.size / 1024)} KB`;
+ownedRoutes(avatars, {
+  list: "/avatars",
+  files: "/avatar-files",
+  noun: "avatar",
+  describe: (m) => `${m.kind}, ${kb(m)}, face tracking ${m.faceTracking ? "yes" : "no"}`,
 });
+ownedRoutes(worlds, { list: "/worlds", files: "/world-files", noun: "world", describe: kb });
 
 app.get("/readme/", async (_req, res) => {
   res.type("html").send(renderReadmePage(await renderReadme()));

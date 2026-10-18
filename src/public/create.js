@@ -1,4 +1,4 @@
-import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, faceIn, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
+import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, faceIn, loadAvatar, loadTracker, loadWorld, track, webglAvailable } from "./avatar.js";
 import { DEFAULT_STYLE, STYLES, portrait, stylise, toJpeg } from "./room.js";
 import { me, save } from "./me.js";
 
@@ -121,7 +121,100 @@ modelDelete.addEventListener("click", async () => {
 
 if (!webglAvailable) modelStatus.textContent = "This browser can't draw 3D avatars. Camera and Upload still work.";
 loadModels();
-worldSelect.append(...WORLDS.map((w) => new Option(w, w)));
+// World is grouped by what each kind really is: drawn standard backdrops, a
+// flat photo of your room, and true 3D scenes you uploaded.
+const worldGroups = {
+  standard: Object.assign(document.createElement("optgroup"), { label: "Standard" }),
+  room: Object.assign(document.createElement("optgroup"), { label: "Room photo (2D)" }),
+  world3d: Object.assign(document.createElement("optgroup"), { label: "3D worlds" }),
+};
+worldGroups.standard.append(...WORLDS.map((w) => new Option(w, w)));
+worldSelect.append(worldGroups.standard);
+const worlds3d = new Map(); // "world:<id>" -> { id, name, url }
+const worldEl = {
+  file: document.getElementById("world-file"),
+  remove: document.getElementById("world-delete"),
+  status: document.getElementById("world-status"),
+};
+const current3dWorld = () => worlds3d.get(worldSelect.value);
+
+function renderWorldGroups() {
+  worldGroups.room.hidden = !worldGroups.room.children.length;
+  worldGroups.world3d.hidden = !worldGroups.world3d.children.length;
+  for (const g of [worldGroups.room, worldGroups.world3d]) if (!g.parentNode) worldSelect.append(g);
+}
+
+function addWorldOption(world) {
+  const key = `world:${world.id}`;
+  worlds3d.set(key, world);
+  if (!worldGroups.world3d.querySelector(`option[value="${CSS.escape(key)}"]`)) {
+    worldGroups.world3d.append(new Option(world.name, key));
+  }
+  renderWorldGroups();
+  return key;
+}
+
+function selectWorld() {
+  const world = current3dWorld();
+  worldEl.remove.hidden = !world;
+  worldEl.status.textContent = world ? `${world.name} is a 3D scene: the avatar stands inside it.` : "";
+  if (world) {
+    loadWorld(world.url).catch((err) => {
+      if (current3dWorld() === world) worldEl.status.textContent = `${world.name} couldn't load: ${err.message}`;
+    });
+  }
+  updateHint();
+}
+worldSelect.addEventListener("change", selectWorld);
+
+fetch("/worlds")
+  .then((r) => (r.ok ? r.json() : []))
+  .then((list) => list.forEach(addWorldOption))
+  .catch(() => {});
+
+worldEl.file.addEventListener("change", async () => {
+  const file = worldEl.file.files?.[0];
+  worldEl.file.value = "";
+  if (!file) return;
+  if (!/\.glb$/i.test(file.name)) {
+    worldEl.status.textContent = "Pick a .glb file. Export your scene as binary glTF with everything embedded.";
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    worldEl.status.textContent = "That world is over 20 MB.";
+    return;
+  }
+  worldEl.status.textContent = `Uploading ${file.name}…`;
+  const name = file.name.replace(/\.glb$/i, "").slice(0, 40);
+  const res = await fetch(`/worlds?${new URLSearchParams({ name })}`, {
+    method: "POST",
+    headers: { "content-type": "model/gltf-binary" },
+    body: file,
+  }).catch(() => null);
+  const body = await res?.json().catch(() => ({}));
+  if (!res?.ok) {
+    worldEl.status.textContent = body?.error ?? "Upload failed. Try again.";
+    return;
+  }
+  worldSelect.value = addWorldOption(body);
+  selectWorld();
+});
+
+worldEl.remove.addEventListener("click", async () => {
+  const world = current3dWorld();
+  if (!world || !confirm(`Delete ${world.name}?`)) return;
+  const res = await fetch(`/worlds/${encodeURIComponent(world.id)}`, { method: "DELETE" }).catch(() => null);
+  if (!res?.ok) {
+    worldEl.status.textContent = "Couldn't delete that world.";
+    return;
+  }
+  const key = `world:${world.id}`;
+  worlds3d.delete(key);
+  worldGroups.world3d.querySelector(`option[value="${CSS.escape(key)}"]`)?.remove();
+  renderWorldGroups();
+  worldSelect.value = WORLDS[0];
+  selectWorld();
+});
 
 // --- Transform my room (a 2D photo background; see room.js) -------------
 const roomEl = {
@@ -162,11 +255,10 @@ function useRoomPhoto(source) {
   restyleRoom();
   if (face) roomEl.status.textContent = "There's a face in this photo. Anyone in it will be in your video: retake it with the room empty.";
   roomEl.styling.hidden = false;
-  if (![...worldSelect.options].some((o) => o.value === ROOM_PHOTO)) {
-    worldSelect.append(new Option("My room (photo)", ROOM_PHOTO));
-  }
+  if (!worldGroups.room.children.length) worldGroups.room.append(new Option("My room (photo)", ROOM_PHOTO));
+  renderWorldGroups();
   worldSelect.value = ROOM_PHOTO;
-  updateHint();
+  selectWorld();
 }
 
 roomStyle.addEventListener("change", () => {
@@ -271,8 +363,10 @@ roomEl.clear.addEventListener("click", () => {
   roomEl.styling.hidden = true;
   roomEl.consent.hidden = true;
   roomEl.status.textContent = "";
-  worldSelect.querySelector(`option[value="${ROOM_PHOTO}"]`)?.remove();
-  updateHint();
+  worldGroups.room.replaceChildren();
+  renderWorldGroups();
+  if (worldSelect.value === ROOM_PHOTO || !worldSelect.value) worldSelect.value = WORLDS[0];
+  selectWorld();
 });
 postForm.elements.namedItem("avatar").value = me.avatar;
 postForm.elements.namedItem("name").value = me.name;
@@ -332,16 +426,20 @@ function updateHint() {
       ? "Camera mode: records what your camera sees."
       : worldSelect.value === LIVE_CAMERA
         ? "Live camera: your real camera, blurred, is recorded behind the avatar. You, your face and your room can still be recognised in the clip."
-        : worldSelect.value === ROOM_PHOTO
+        : current3dWorld()
+          ? "3D world: your face is tracked on this device. Only the avatar and the 3D world are recorded."
+          : worldSelect.value === ROOM_PHOTO
           ? "Room photo: your face is tracked on this device. The avatar and your room photo are recorded."
           : "Avatar mode: your face is tracked on this device. Only the avatar is recorded.";
 }
-worldSelect.addEventListener("change", updateHint);
 
 async function enterLive(next) {
   mode = next;
   avatarPickers.hidden = mode !== "avatar";
   document.getElementById("avatar-upload").hidden = mode !== "avatar";
+  document.getElementById("world-upload").hidden = mode !== "avatar";
+  worldEl.status.hidden = mode !== "avatar";
+  document.getElementById("room").hidden = mode !== "avatar";
   modelStatus.hidden = mode !== "avatar";
   updateHint();
   liveControls.hidden = false;
@@ -390,7 +488,8 @@ function frame(t) {
         } catch {}
       }
       const backdrop = worldSelect.value === ROOM_PHOTO ? roomBackdrop() : null;
-      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, backdrop, camera, t, pose });
+      const world3d = current3dWorld()?.url ?? null;
+      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, backdrop, world3d, camera, t, pose });
     } else if (mode === "camera") {
       drawCameraScene(ctx, camera);
     }

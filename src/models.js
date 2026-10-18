@@ -6,43 +6,15 @@ import path from "node:path";
 import { DATA_DIR } from "./store.js";
 import { UploadError } from "./upload.js";
 
-// People's own 3D avatars: binary glTF (.glb), and VRM, which is a .glb with
-// avatar extensions. They live on the volume beside the clips, owned by the
-// handle that uploaded them, and are only ever served back to their owner.
-export const MODELS_DIR = path.join(DATA_DIR, "models");
-const MODELS_FILE = path.join(DATA_DIR, "models.json");
-export const MAX_MODEL_BYTES = 15 * 1024 * 1024;
-const PER_PERSON = 5;
-const NAME_MAX = 40;
-
-// Past these a model would stall a phone; real VRM avatars sit well under.
-const LIMITS = { nodes: 2000, meshes: 300, materials: 200, textures: 64, images: 64, accessors: 5000, animations: 64 };
-
-let models = [];
-let ready = null;
-let writeQueue = Promise.resolve();
-
-async function load() {
-  await mkdir(MODELS_DIR, { recursive: true });
-  try {
-    models = JSON.parse(await readFile(MODELS_FILE, "utf8"));
-  } catch {
-    models = [];
-  }
-}
-const ensureLoaded = () => (ready ??= load());
-function save() {
-  writeQueue = writeQueue.then(() => writeFile(MODELS_FILE, JSON.stringify(models)));
-  return writeQueue;
-}
-
-// What its owner sees: never the file on disk, only where to fetch it.
-const toPublic = ({ file, by, ...rest }) => ({ ...rest, url: `/avatar-files/${rest.id}` });
+// People's own 3D files: avatars (.vrm, or .glb for preview) and worlds
+// (.glb scenes). Both are binary glTF, checked the same way, stored on the
+// volume beside the clips, owned by the handle that uploaded them, and only
+// ever served back to their owner. Each kind is one `ownedModels` collection.
 
 // Reads a binary glTF's header and JSON chunk and decides whether it's safe to
 // hand to a browser. Returns what the studio needs to know about it, or throws
 // an UploadError saying what's wrong. https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#glb-file-format-specification
-export function inspectGlb(buf) {
+export function inspectGlb(buf, limits) {
   const bad = (msg) => new UploadError(415, msg);
   if (buf.length < 20 || buf.toString("latin1", 0, 4) !== "glTF") throw bad("that isn't a .vrm or .glb file");
   if (buf.readUInt32LE(4) !== 2) throw bad("only glTF 2.0 models are supported");
@@ -69,7 +41,7 @@ export function inspectGlb(buf) {
     const unknown = gltf.extensionsRequired.filter((e) => !known.has(e));
     if (unknown.length) throw bad(`that model needs ${unknown.join(", ")}, which isn't supported`);
   }
-  for (const [key, max] of Object.entries(LIMITS)) {
+  for (const [key, max] of Object.entries(limits)) {
     if ((gltf[key]?.length ?? 0) > max) throw bad(`that model is too complex: more than ${max} ${key}`);
   }
 
@@ -92,77 +64,137 @@ export function inspectGlb(buf) {
   };
 }
 
-export async function listModels(by) {
-  await ensureLoaded();
-  return models.filter((m) => m.by === by).map(toPublic);
-}
+// One kind of owned 3D file. `route` is where its files are served
+// (`/${route}/:id`), `noun` names it in messages, and `accept(info)` may
+// refuse a file that's valid glTF but the wrong kind of thing.
+export function ownedModels({ name, route, noun, maxBytes, perPerson, limits, accept = () => null }) {
+  const dir = path.join(DATA_DIR, name);
+  const indexFile = path.join(DATA_DIR, `${name}.json`);
+  const nameMax = 40;
+  let items = [];
+  let ready = null;
+  let writeQueue = Promise.resolve();
 
-// The file for /avatar-files/:id, only for its owner. Null otherwise, and the
-// route answers 404 either way, so ids can't be probed for.
-export async function modelFile(id, by) {
-  await ensureLoaded();
-  const model = models.find((m) => m.id === id);
-  return model && model.by === by ? path.join(MODELS_DIR, model.file) : null;
-}
-
-export async function ownsModel(id, by) {
-  await ensureLoaded();
-  return models.some((m) => m.id === id && m.by === by);
-}
-
-export async function receiveModel(req, by, name) {
-  await ensureLoaded();
-  if (models.filter((m) => m.by === by).length >= PER_PERSON) {
-    throw new UploadError(409, `you can keep ${PER_PERSON} avatars; delete one first`);
-  }
-  const tmp = path.join(MODELS_DIR, `.${randomUUID()}.part`);
-  const out = createWriteStream(tmp);
-  let size = 0;
-  try {
-    for await (const chunk of req) {
-      size += chunk.length;
-      if (size > MAX_MODEL_BYTES) throw new UploadError(413, "that model is too big — keep it under 15 MB");
-      if (size === chunk.length && chunk.length >= 4 && chunk.toString("latin1", 0, 4) !== "glTF") {
-        throw new UploadError(415, "that isn't a .vrm or .glb file");
-      }
-      if (!out.write(chunk)) await once(out, "drain");
+  async function load() {
+    await mkdir(dir, { recursive: true });
+    try {
+      items = JSON.parse(await readFile(indexFile, "utf8"));
+    } catch {
+      items = [];
     }
-    out.end();
-    await once(out, "finish");
-    // Under 15 MB, so reading it back whole to inspect is affordable.
-    const info = inspectGlb(await readFile(tmp));
-    const id = randomUUID();
-    const file = `${id}.${info.kind === "glb" ? "glb" : "vrm"}`;
-    await rename(tmp, path.join(MODELS_DIR, file));
-    const model = {
-      id,
-      by,
-      file,
-      name: String(name || info.title || "My avatar").trim().slice(0, NAME_MAX),
-      kind: info.kind,
-      faceTracking: info.faceTracking,
-      expressions: info.expressions,
-      size: (await stat(path.join(MODELS_DIR, file))).size,
-      createdAt: new Date().toISOString(),
-    };
-    models.push(model);
-    await save();
-    return toPublic(model);
-  } catch (err) {
-    out.destroy();
-    await rm(tmp, { force: true });
-    throw err;
   }
+  const ensureLoaded = () => (ready ??= load());
+  const save = () => (writeQueue = writeQueue.then(() => writeFile(indexFile, JSON.stringify(items))));
+
+  // What its owner sees: never the file on disk, only where to fetch it.
+  const toPublic = ({ file, by, ...rest }) => ({ ...rest, url: `/${route}/${rest.id}` });
+
+  return {
+    maxBytes,
+    async list(by) {
+      await ensureLoaded();
+      return items.filter((m) => m.by === by).map(toPublic);
+    },
+
+    // The file for /${route}/:id, only for its owner. Null otherwise, and the
+    // route answers 404 either way, so ids can't be probed for.
+    async file(id, by) {
+      await ensureLoaded();
+      const item = items.find((m) => m.id === id);
+      return item && item.by === by ? path.join(dir, item.file) : null;
+    },
+
+    async owns(id, by) {
+      await ensureLoaded();
+      return items.some((m) => m.id === id && m.by === by);
+    },
+
+    async totalBytes() {
+      await ensureLoaded();
+      return items.reduce((sum, m) => sum + (m.size ?? 0), 0);
+    },
+
+    async receive(req, by, requestedName) {
+      await ensureLoaded();
+      if (items.filter((m) => m.by === by).length >= perPerson) {
+        throw new UploadError(409, `you can keep ${perPerson} ${noun}s; delete one first`);
+      }
+      const tmp = path.join(dir, `.${randomUUID()}.part`);
+      const out = createWriteStream(tmp);
+      let size = 0;
+      try {
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size > maxBytes) throw new UploadError(413, `that ${noun} is too big — keep it under ${maxBytes / 1024 / 1024} MB`);
+          if (size === chunk.length && chunk.length >= 4 && chunk.toString("latin1", 0, 4) !== "glTF") {
+            throw new UploadError(415, "that isn't a .vrm or .glb file");
+          }
+          if (!out.write(chunk)) await once(out, "drain");
+        }
+        out.end();
+        await once(out, "finish");
+        // Under the size cap, so reading it back whole to inspect is affordable.
+        const info = inspectGlb(await readFile(tmp), limits);
+        const refusal = accept(info);
+        if (refusal) throw new UploadError(415, refusal);
+        const id = randomUUID();
+        const file = `${id}.${info.kind === "glb" ? "glb" : "vrm"}`;
+        await rename(tmp, path.join(dir, file));
+        const item = {
+          id,
+          by,
+          file,
+          name: String(requestedName || info.title || `My ${noun}`).trim().slice(0, nameMax),
+          kind: info.kind,
+          faceTracking: info.faceTracking,
+          expressions: info.expressions,
+          size: (await stat(path.join(dir, file))).size,
+          createdAt: new Date().toISOString(),
+        };
+        items.push(item);
+        await save();
+        return toPublic(item);
+      } catch (err) {
+        out.destroy();
+        await rm(tmp, { force: true });
+        throw err;
+      }
+    },
+
+    async remove(id, by) {
+      await ensureLoaded();
+      const index = items.findIndex((m) => m.id === id);
+      if (index === -1) return "missing";
+      const item = items[index];
+      if (item.by !== by) return "forbidden";
+      items.splice(index, 1);
+      await save();
+      await rm(path.join(dir, item.file), { force: true });
+      return toPublic(item);
+    },
+  };
 }
 
-export async function removeModel(id, by) {
-  await ensureLoaded();
-  const index = models.findIndex((m) => m.id === id);
-  if (index === -1) return "missing";
-  const model = models[index];
-  if (model.by !== by) return "forbidden";
-  models.splice(index, 1);
-  await save();
-  await rm(path.join(MODELS_DIR, model.file), { force: true });
-  return toPublic(model);
-}
+// Avatars: past these limits a model would stall a phone; real VRM avatars
+// sit well under.
+export const avatars = ownedModels({
+  name: "models",
+  route: "avatar-files",
+  noun: "avatar",
+  maxBytes: 15 * 1024 * 1024,
+  perPerson: 5,
+  limits: { nodes: 2000, meshes: 300, materials: 200, textures: 64, images: 64, accessors: 5000, animations: 64 },
+});
+
+// Worlds: a scene the avatar stands in. Bigger than an avatar, but still
+// drawn every frame on a phone while it records. A world that is itself an
+// avatar (VRM) is refused: it would be the wrong thing in the wrong place.
+export const worlds = ownedModels({
+  name: "worlds",
+  route: "world-files",
+  noun: "world",
+  maxBytes: 20 * 1024 * 1024,
+  perPerson: 3,
+  limits: { nodes: 5000, meshes: 1000, materials: 300, textures: 64, images: 64, accessors: 12000, animations: 16 },
+  accept: (info) => (info.kind === "glb" ? null : "that's an avatar; upload a world as a plain .glb"),
+});

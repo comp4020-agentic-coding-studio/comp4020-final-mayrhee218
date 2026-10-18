@@ -139,3 +139,31 @@ it("records which 3D avatar a clip used, apart from the emoji, and only one you 
 
   await owner.send(`/avatars/${model.id}`, { method: "DELETE" });
 });
+
+// Worlds are the same kind of owned glTF upload, as scenes rather than
+// characters: a plain .glb only, bigger limits, the same ownership.
+it("keeps an uploaded 3D world for its owner only, and refuses an avatar as a world", async () => {
+  const owner = await person();
+  const other = await person();
+  const scene = glb({ asset: { version: "2.0" }, nodes: [{ name: "floor" }, { name: "wall" }] });
+  const upload = (who: typeof owner, bytes: Uint8Array) =>
+    who.send("/worlds?name=spec%20world", {
+      method: "POST",
+      headers: { "content-type": "model/gltf-binary" },
+      body: new Blob([new Uint8Array(bytes)]),
+    });
+
+  expect((await upload(owner, vrm0())).status).toBe(415);
+  expect((await upload(owner, vrm0({ images: [{ uri: "https://tracker.example/x.png" }] }))).status).toBe(415);
+
+  const res = await upload(owner, scene);
+  expect(res.status).toBe(201);
+  const world = (await res.json()) as Model;
+  expect(world).toMatchObject({ name: "spec world", kind: "glb" });
+
+  expect((await (await other.send("/worlds")).json()).map((w: Model) => w.id)).not.toContain(world.id);
+  expect((await owner.send(world.url)).status).toBe(200);
+  expect((await other.send(world.url)).status).toBe(404);
+  expect((await other.send(`/worlds/${world.id}`, { method: "DELETE" })).status).toBe(403);
+  expect((await owner.send(`/worlds/${world.id}`, { method: "DELETE" })).status).toBe(204);
+});

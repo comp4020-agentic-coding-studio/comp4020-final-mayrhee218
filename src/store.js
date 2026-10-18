@@ -57,16 +57,9 @@ export async function listVideos() {
   return [...videos].reverse().map(toPublic);
 }
 
-// Everything on the volume people put there: clips, and uploaded avatars
-// (src/models.js keeps their sizes in models.json).
 export async function storedBytes() {
   await ensureLoaded();
-  let models = [];
-  try {
-    models = JSON.parse(await readFile(path.join(DATA_DIR, "models.json"), "utf8"));
-  } catch {}
-  // AI room backgrounds are capped per person and small; they aren't counted.
-  return [...videos, ...models].reduce((sum, x) => sum + (x.size ?? 0), 0);
+  return videos.reduce((sum, v) => sum + v.size, 0);
 }
 
 export async function addVideo(video) {
