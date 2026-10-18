@@ -1,4 +1,5 @@
 import express from "express";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { identify } from "./identity.js";
 import { attachLive, broadcast } from "./live.js";
@@ -17,12 +18,16 @@ import {
   setLike,
   storedBytes,
 } from "./store.js";
+import { MAX_MODEL_BYTES, listModels, modelFile, ownsModel, receiveModel, removeModel } from "./models.js";
 import { MAX_BYTES, UploadError, receiveVideo } from "./upload.js";
 import { AVATARS, renderCreate, renderFeed, renderReadmePage } from "./views.js";
 
 // The volume is 1 GB; leave headroom for metadata and a clip mid-upload.
 const STORAGE_BUDGET = 850 * 1024 * 1024;
 const SOURCES = ["avatar", "camera", "upload"];
+const BUILTIN_MODELS = JSON.parse(
+  readFileSync(fileURLToPath(new URL("./public/models/manifest.json", import.meta.url)), "utf8"),
+).models.map((m) => m.id);
 
 const app = express();
 app.set("trust proxy", true);
@@ -63,7 +68,13 @@ app.post("/videos", async (req, res) => {
   }
   try {
     const stored = await receiveVideo(req, VIDEOS_DIR);
+    // Which 3D avatar was in the clip: kept apart from the emoji `avatar`, and
+    // only if it's a built-in or one of the poster's own uploads.
+    const modelId = String(req.query.avatarModelId ?? "");
+    const avatarModelId =
+      BUILTIN_MODELS.includes(modelId) || (modelId && (await ownsModel(modelId, req.by))) ? modelId : undefined;
     const video = await addVideo({
+      ...(avatarModelId && { avatarModelId }),
       ...stored,
       ...person(req, req.query),
       by: req.by,
@@ -123,6 +134,45 @@ app.delete("/videos/:id/comments/:commentId", async (req, res) => {
   const theirs = result.by === req.by ? "their own" : `${who(result.by)}'s`;
   act(req.by, `deleted ${theirs} comment on video ${shortId(req.params.id)}: ${quote(result.text)}`);
   broadcast({ type: "comment-removed", id: req.params.id, commentId: req.params.commentId });
+  res.status(204).end();
+});
+
+// Your own 3D avatars. Every route answers only for the browser that uploaded
+// them: there is no way to list, fetch or delete someone else's.
+app.get("/avatars", async (req, res) => {
+  res.json(await listModels(req.by));
+});
+
+app.post("/avatars", async (req, res) => {
+  if (Number(req.get("content-length") ?? 0) > MAX_MODEL_BYTES) {
+    return res.status(413).json({ error: "that model is too big — keep it under 15 MB" });
+  }
+  if ((await storedBytes()) > STORAGE_BUDGET) {
+    return res.status(507).json({ error: "the space is full for now" });
+  }
+  try {
+    const model = await receiveModel(req, req.by, req.query.name);
+    act(req.by, `uploaded avatar ${shortId(model.id)} ${quote(model.name)} [${model.kind}, ${Math.round(model.size / 1024)} KB, face tracking ${model.faceTracking ? "yes" : "no"}]`);
+    res.status(201).json(model);
+  } catch (err) {
+    if (!(err instanceof UploadError)) throw err;
+    act(req.by, `FAILED avatar upload: ${err.message}`);
+    res.status(err.status).json({ error: err.message });
+  }
+});
+
+app.get("/avatar-files/:id", async (req, res) => {
+  const file = await modelFile(req.params.id, req.by);
+  if (!file) return res.status(404).json({ error: "no such avatar" });
+  res.set("cache-control", "private, max-age=86400");
+  res.type("model/gltf-binary").sendFile(file);
+});
+
+app.delete("/avatars/:id", async (req, res) => {
+  const result = await removeModel(req.params.id, req.by);
+  if (result === "forbidden") act(req.by, `REFUSED delete avatar ${shortId(req.params.id)}`);
+  if (typeof result === "string") return refuse(res, result, "avatar");
+  act(req.by, `deleted avatar ${shortId(req.params.id)} ${quote(result.name)}`);
   res.status(204).end();
 });
 
