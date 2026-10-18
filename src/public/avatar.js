@@ -5,9 +5,6 @@ const MEDIAPIPE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0";
 const MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
-// The avatars on offer, by name, from src/public/models.
-export const AVATARS = { "Cool Banana": "CoolBanana.vrm", Hotdog: "Hotdog.vrm", Mushy: "Mushy.vrm" };
-export const DEFAULT_AVATAR = "Cool Banana";
 
 export const WORLDS = ["Dusk room", "Neon street", "Cloud sky", "My room (AR)"];
 
@@ -166,9 +163,9 @@ function drawWorld(ctx, world, w, h, t, camera) {
 // avatar mode: camera and upload keep working.
 let stage = null; // Promise of the three.js setup, made once
 let three = null; // that setup, once it has resolved
-const loading = new Map(); // avatar name -> Promise of { vrm, centre, frame }
-const ready = new Map(); // avatar name -> { vrm, centre, frame } once loaded
-const failed = new Set();
+const loading = new Map(); // model url -> Promise of a loaded avatar
+const ready = new Map(); // model url -> loaded avatar
+const failed = new Map(); // model url -> why it couldn't load
 let shown = null;
 let lastT = null;
 
@@ -191,38 +188,55 @@ async function setup() {
   return three;
 }
 
-// Starts loading an avatar if it isn't already; resolves when it can be drawn.
-export function loadAvatar(name) {
-  if (!AVATARS[name]) name = DEFAULT_AVATAR;
-  if (!loading.has(name)) {
-    failed.delete(name);
+export const webglAvailable = (() => {
+  try {
+    return Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+})();
+
+// Starts loading the model at `url` if it isn't already, and resolves to
+// { vrm, scene, centre, frame, tracked } once it can be drawn. A plain GLB, or
+// a VRM without a head bone, still shows, but `tracked` is false: it can't
+// follow your face, and the studio says so.
+export function loadAvatar(url) {
+  if (!loading.has(url)) {
+    failed.delete(url);
     const promise = (async () => {
+      if (!webglAvailable) throw new Error("this browser can't draw 3D");
       const { THREE, VRMUtils, loader } = await (stage ??= setup());
-      const gltf = await loader.loadAsync(`/assets/models/${AVATARS[name]}`);
-      const vrm = gltf.userData.vrm;
-      VRMUtils.rotateVRM0(vrm); // these are VRM 0.0 models, which face away
-      const bone = (b) => vrm.humanoid.getNormalizedBoneNode(b);
-      // Out of the T-pose: arms rest at the sides.
-      if (bone("leftUpperArm")) bone("leftUpperArm").rotation.z = 1.2;
-      if (bone("rightUpperArm")) bone("rightUpperArm").rotation.z = -1.2;
-      vrm.update(0);
-      vrm.scene.updateMatrixWorld(true);
-      // These characters are all head: frame the whole model, a little above
-      // centre so it stands clear of the controls at the bottom.
-      const box = new THREE.Box3().setFromObject(vrm.scene);
+      const gltf = await loader.loadAsync(url);
+      const vrm = gltf.userData.vrm ?? null;
+      const scene = vrm?.scene ?? gltf.scene;
+      if (vrm) {
+        // VRM 0.x faces away from the camera; 1.0 already faces it.
+        if (vrm.meta?.metaVersion === "0") VRMUtils.rotateVRM0(vrm);
+        const bone = (b) => vrm.humanoid?.getNormalizedBoneNode(b);
+        // Out of the T-pose: arms rest at the sides.
+        if (bone("leftUpperArm")) bone("leftUpperArm").rotation.z = 1.2;
+        if (bone("rightUpperArm")) bone("rightUpperArm").rotation.z = -1.2;
+        vrm.update(0);
+      }
+      scene.updateMatrixWorld(true);
+      // Frame the whole model, a little above centre so it stands clear of
+      // the controls at the bottom.
+      const box = new THREE.Box3().setFromObject(scene);
+      if (box.isEmpty()) throw new Error("that model has nothing to draw");
       const frame = (box.max.y - box.min.y) * 1.25;
       const centre = box.getCenter(new THREE.Vector3()).y - frame * 0.08;
-      const loaded = { vrm, centre, frame };
-      ready.set(name, loaded);
+      const tracked = Boolean(vrm?.humanoid?.getNormalizedBoneNode("head"));
+      const loaded = { vrm, scene, centre, frame, tracked };
+      ready.set(url, loaded);
       return loaded;
     })();
-    promise.catch(() => {
-      loading.delete(name);
-      failed.add(name);
+    promise.catch((err) => {
+      loading.delete(url);
+      failed.set(url, err?.message ?? "Avatar couldn't load");
     });
-    loading.set(name, promise);
+    loading.set(url, promise);
   }
-  return loading.get(name);
+  return loading.get(url);
 }
 
 function say(ctx, text, w, h) {
@@ -234,48 +248,69 @@ function say(ctx, text, w, h) {
   ctx.fillText(text, w / 2, h * 0.45 + 36);
 }
 
-function drawCharacter(ctx, name, s, w, h, t) {
-  const avatar = ready.get(name);
+// Sets an expression only if this model has it: models name them differently,
+// and many have only some (the built-ins carry blink and a/e/i/o/u, no smile).
+function express(em, names, value) {
+  for (const name of names) {
+    if (em.getExpression(name)) {
+      em.setValue(name, clamp(value, 0, 1));
+      return;
+    }
+  }
+}
+
+function drawCharacter(ctx, url, s, w, h, t) {
+  const avatar = ready.get(url);
   if (!avatar || !three) {
-    if (failed.has(name)) say(ctx, "Avatar couldn't load", w, h);
+    if (!webglAvailable) say(ctx, "3D isn't available here", w, h);
+    else if (failed.has(url)) say(ctx, "Avatar couldn't load", w, h);
     else {
-      loadAvatar(name);
+      loadAvatar(url).catch(() => {});
       say(ctx, "Loading avatar…", w, h);
     }
     return;
   }
   const { THREE, renderer, scene, camera } = three;
-  const { vrm, centre, frame } = avatar;
-  if (shown !== vrm) {
-    if (shown) scene.remove(shown.scene);
-    scene.add(vrm.scene);
-    shown = vrm;
+  const { vrm, scene: model, centre, frame, tracked } = avatar;
+  if (shown !== model) {
+    if (shown) scene.remove(shown);
+    scene.add(model);
+    shown = model;
   }
-
-  // Head turn, nod and tilt, shared between neck and head so it bends
-  // naturally. The pose is already mirrored, so it moves like a reflection.
-  const yaw = s.yaw * 1.3;
-  const pitch = s.pitch * 1.4;
-  const roll = -s.roll;
-  const neck = vrm.humanoid.getNormalizedBoneNode("neck");
-  const headBone = vrm.humanoid.getNormalizedBoneNode("head");
-  const share = neck ? 0.6 : 1;
-  headBone.rotation.set(pitch * share, yaw * share, roll * share);
-  neck?.rotation.set(pitch * 0.4, yaw * 0.4, roll * 0.4);
-
-  // These models carry blink and the a/e/i/o/u mouth shapes, no smile.
-  const em = vrm.expressionManager;
-  em?.setValue("blink", clamp(Math.max(s.blinkL, s.blinkR) * 1.2, 0, 1));
-  em?.setValue("aa", clamp(s.jaw * 1.6, 0, 1));
 
   const dt = lastT === null ? 0 : clamp((t - lastT) / 1000, 0, 0.1);
   lastT = t;
-  vrm.update(dt);
 
-  // Follow the face around the frame and in and out, like the 2D one did.
+  if (tracked) {
+    // Head turn, nod and tilt, shared between neck and head so it bends
+    // naturally. The pose is already mirrored, so it moves like a reflection.
+    const yaw = s.yaw * 1.3;
+    const pitch = s.pitch * 1.4;
+    const roll = -s.roll;
+    const neck = vrm.humanoid.getNormalizedBoneNode("neck");
+    const head = vrm.humanoid.getNormalizedBoneNode("head");
+    const share = neck ? 0.6 : 1;
+    head.rotation.set(pitch * share, yaw * share, roll * share);
+    neck?.rotation.set(pitch * 0.4, yaw * 0.4, roll * 0.4);
+  }
+  const em = vrm?.expressionManager;
+  if (em) {
+    // VRM 1.0 names first, then the VRM 0.x presets three-vrm maps them from.
+    if (em.getExpression("blinkLeft") && em.getExpression("blinkRight")) {
+      express(em, ["blinkLeft"], s.blinkL * 1.2);
+      express(em, ["blinkRight"], s.blinkR * 1.2);
+    } else express(em, ["blink"], Math.max(s.blinkL, s.blinkR) * 1.2);
+    express(em, ["aa", "a"], s.jaw * 1.6);
+    express(em, ["happy", "joy"], s.smile * 1.2);
+    express(em, ["surprised"], s.brows * 0.8);
+  }
+  vrm?.update(dt);
+
+  // Follow the face around the frame and in and out.
   const viewW = frame * (w / h);
-  vrm.scene.position.x = (s.x - 0.5) * 0.5 * viewW;
-  vrm.scene.position.y = -(s.y - 0.45) * 0.4 * frame;
+  model.position.x = (s.x - 0.5) * 0.5 * viewW;
+  model.position.y = -(s.y - 0.45) * 0.4 * frame;
+  if (!tracked) model.rotation.y = s.yaw * 0.6; // a plain model turns whole
   const distance = frame / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / clamp(s.scale, 0.7, 1.4);
   camera.position.set(0, centre, distance);
   camera.lookAt(0, centre, 0);
@@ -284,10 +319,12 @@ function drawCharacter(ctx, name, s, w, h, t) {
   ctx.drawImage(renderer.domElement, 0, 0, w, h);
 }
 
-export function drawAvatarScene(ctx, { look, world, camera, t, pose: tracked }) {
+// `model` is the URL of the avatar to draw: a built-in under /assets/models/
+// or an upload under /avatar-files/.
+export function drawAvatarScene(ctx, { model, world, camera, t, pose: tracked }) {
   const { width: w, height: h } = ctx.canvas;
   drawWorld(ctx, world, w, h, t, camera);
-  drawCharacter(ctx, look, tracked?.found ? tracked : idle(t), w, h, t);
+  drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t);
 }
 
 // Camera mode: the raw camera, cropped to 9:16 and mirrored like a selfie.
