@@ -1,4 +1,4 @@
-import { AVATARS, WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track } from "./avatar.js";
+import { WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
 import { me, save } from "./me.js";
 
 const MAX_SECONDS = 30;
@@ -20,10 +20,102 @@ const postStatus = document.getElementById("post-status");
 const lookSelect = document.getElementById("look");
 const worldSelect = document.getElementById("world");
 
-lookSelect.append(...Object.keys(AVATARS).map((a) => new Option(a, a)));
-// Fetch the model while the camera permission prompt is up.
-loadAvatar(lookSelect.value).catch(() => {});
-lookSelect.addEventListener("change", () => loadAvatar(lookSelect.value).catch(() => {}));
+const modelFile = document.getElementById("model-file");
+const modelDelete = document.getElementById("model-delete");
+const modelStatus = document.getElementById("model-status");
+const MAX_MODEL_BYTES = 15 * 1024 * 1024;
+const MODEL_KEY = "the-space:model";
+
+// Every avatar on offer, by id: the built-ins from the manifest, then this
+// browser's own uploads, which the server only ever shows to their owner.
+const models = new Map(); // id -> { id, name, url, faceTracking, mine }
+async function loadModels() {
+  const manifest = await fetch("/assets/models/manifest.json")
+    .then((r) => r.json())
+    .catch(() => ({ models: [] }));
+  for (const m of manifest.models) {
+    models.set(m.id, { id: m.id, name: m.name, url: `/assets/models/${m.file}`, faceTracking: true, mine: false });
+  }
+  const mine = await fetch("/avatars")
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => []);
+  for (const m of mine) models.set(m.id, { ...m, mine: true });
+  let saved = null;
+  try {
+    saved = localStorage.getItem(MODEL_KEY);
+  } catch {}
+  renderModelOptions(saved ?? manifest.default);
+}
+
+function renderModelOptions(selected) {
+  lookSelect.replaceChildren(
+    ...[...models.values()].map((m) => new Option(m.mine ? `${m.name} (yours)` : m.name, m.id)),
+  );
+  lookSelect.value = models.has(selected) ? selected : (lookSelect.options[0]?.value ?? "");
+  selectModel();
+}
+
+const currentModel = () => models.get(lookSelect.value);
+
+function selectModel() {
+  const model = currentModel();
+  modelDelete.hidden = !model?.mine;
+  try {
+    localStorage.setItem(MODEL_KEY, lookSelect.value);
+  } catch {}
+  if (!model) return;
+  modelStatus.textContent = model.faceTracking
+    ? ""
+    : "Preview only: this model has no humanoid head, so it can't follow your face.";
+  loadAvatar(model.url).catch((err) => {
+    if (lookSelect.value === model.id) modelStatus.textContent = `${model.name} couldn't load: ${err.message}`;
+  });
+}
+lookSelect.addEventListener("change", selectModel);
+
+modelFile.addEventListener("change", async () => {
+  const file = modelFile.files?.[0];
+  modelFile.value = "";
+  if (!file) return;
+  if (!/\.(vrm|glb)$/i.test(file.name)) {
+    modelStatus.textContent = "Pick a .vrm (or .glb) file.";
+    return;
+  }
+  if (file.size > MAX_MODEL_BYTES) {
+    modelStatus.textContent = "That model is over 15 MB.";
+    return;
+  }
+  modelStatus.textContent = `Uploading ${file.name}…`;
+  const name = file.name.replace(/\.(vrm|glb)$/i, "").slice(0, 40);
+  const res = await fetch(`/avatars?${new URLSearchParams({ name })}`, {
+    method: "POST",
+    headers: { "content-type": "model/gltf-binary" },
+    body: file,
+  }).catch(() => null);
+  const body = await res?.json().catch(() => ({}));
+  if (!res?.ok) {
+    modelStatus.textContent = body?.error ?? "Upload failed. Try again.";
+    return;
+  }
+  models.set(body.id, { ...body, mine: true });
+  renderModelOptions(body.id);
+  if (body.faceTracking) modelStatus.textContent = `${body.name} is ready.`;
+});
+
+modelDelete.addEventListener("click", async () => {
+  const model = currentModel();
+  if (!model?.mine || !confirm(`Delete ${model.name}?`)) return;
+  const res = await fetch(`/avatars/${encodeURIComponent(model.id)}`, { method: "DELETE" }).catch(() => null);
+  if (!res?.ok) {
+    modelStatus.textContent = "Couldn't delete that avatar.";
+    return;
+  }
+  models.delete(model.id);
+  renderModelOptions("");
+});
+
+if (!webglAvailable) modelStatus.textContent = "This browser can't draw 3D avatars. Camera and Upload still work.";
+loadModels();
 worldSelect.append(...WORLDS.map((w) => new Option(w, w)));
 postForm.elements.namedItem("avatar").value = me.avatar;
 postForm.elements.namedItem("name").value = me.name;
@@ -90,6 +182,8 @@ worldSelect.addEventListener("change", updateHint);
 async function enterLive(next) {
   mode = next;
   avatarPickers.hidden = mode !== "avatar";
+  document.getElementById("avatar-upload").hidden = mode !== "avatar";
+  modelStatus.hidden = mode !== "avatar";
   updateHint();
   liveControls.hidden = false;
   uploadControls.hidden = true;
@@ -136,7 +230,7 @@ function frame(t) {
           pose = track(camera, t);
         } catch {}
       }
-      drawAvatarScene(ctx, { look: lookSelect.value, world: worldSelect.value, camera, t, pose });
+      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, camera, t, pose });
     } else if (mode === "camera") {
       drawCameraScene(ctx, camera);
     }
@@ -158,6 +252,7 @@ function startRecording() {
   recorder = new MediaRecorder(new MediaStream(tracks), { ...(mimeType && { mimeType }), videoBitsPerSecond: 1_500_000 });
   const chunks = [];
   const source = mode;
+  const model = mode === "avatar" ? lookSelect.value : null;
   recorder.addEventListener("dataavailable", (e) => e.data.size && chunks.push(e.data));
   recorder.addEventListener("stop", () => {
     clearInterval(startRecording.tick);
@@ -165,7 +260,7 @@ function startRecording() {
     recordButton.classList.remove("recording");
     recordButton.setAttribute("aria-label", "start recording");
     if (!chunks.length) return;
-    showClip(new Blob(chunks, { type: recorder.mimeType || mimeType || "video/webm" }), source);
+    showClip(new Blob(chunks, { type: recorder.mimeType || mimeType || "video/webm" }), source, model);
   });
   recorder.start(1000);
   recordButton.classList.add("recording");
@@ -185,8 +280,8 @@ recordButton.addEventListener("click", () => {
   else startRecording();
 });
 
-function showClip(blob, source) {
-  clip = { blob, source };
+function showClip(blob, source, model = null) {
+  clip = { blob, source, model };
   preview.src = URL.createObjectURL(blob);
   preview.hidden = false;
   canvas.hidden = true;
@@ -228,6 +323,7 @@ postForm.addEventListener("submit", async (event) => {
   const data = new FormData(postForm);
   save({ avatar: String(data.get("avatar")), name: String(data.get("name")).trim().slice(0, 40) });
   const query = new URLSearchParams({ caption: String(data.get("caption")), name: me.name, avatar: me.avatar, source: clip.source });
+  if (clip.source === "avatar" && clip.model) query.set("avatarModelId", clip.model);
   const submit = postForm.querySelector('button[type="submit"]');
   submit.disabled = true;
   postStatus.textContent = "Posting…";

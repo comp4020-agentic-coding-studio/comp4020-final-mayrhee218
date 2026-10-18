@@ -132,6 +132,11 @@ export function renderCreate() {
           <label>Avatar <select id="look"></select></label>
           <label>World <select id="world"></select></label>
         </div>
+        <div class="avatar-upload" id="avatar-upload">
+          <label class="pill ghost small">Upload 3D avatar<input type="file" id="model-file" accept=".vrm,.glb" /></label>
+          <button type="button" class="pill ghost small" id="model-delete" hidden>Delete this avatar</button>
+        </div>
+        <p class="hint" id="model-status" role="status"></p>
         <button type="button" class="record" id="record" aria-label="start recording" disabled><span></span></button>
         <p class="hint" id="privacy-hint">Avatar mode: your face is tracked on this device. Only the avatar is recorded.</p>
       </div>
