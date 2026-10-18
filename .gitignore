@@ -21,5 +21,7 @@ mise.local.toml
 # harness is CLAUDE.md (and any AGENTS.md), not this directory.
 .claude/
 
-# local dev data (pnpm dev writes clips here)
+# local dev data (pnpm dev writes clips here), and the throwaway data a
+# local spec server writes (DATA_DIR=./.spec-data)
 .data/
+.spec-data/
