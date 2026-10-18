@@ -2,8 +2,8 @@
   "note": "Built-in avatars offered in Create > Avatar. Each file must be a real VRM in this folder. All three are CC0, by Polygonal Mind.",
   "default": "builtin:cool-banana",
   "models": [
-    { "id": "builtin:cool-banana", "name": "Cool Banana", "file": "CoolBanana.vrm", "license": "CC0", "author": "Polygonal Mind" },
-    { "id": "builtin:hotdog", "name": "Hotdog", "file": "Hotdog.vrm", "license": "CC0", "author": "Polygonal Mind" },
-    { "id": "builtin:mushy", "name": "Mushy", "file": "Mushy.vrm", "license": "CC0", "author": "Polygonal Mind" }
+    { "id": "builtin:cool-banana", "name": "Cool Banana", "file": "CoolBanana.vrm", "roomStyle": "sunny", "license": "CC0", "author": "Polygonal Mind" },
+    { "id": "builtin:hotdog", "name": "Hotdog", "file": "Hotdog.vrm", "roomStyle": "neon", "license": "CC0", "author": "Polygonal Mind" },
+    { "id": "builtin:mushy", "name": "Mushy", "file": "Mushy.vrm", "roomStyle": "mochi", "license": "CC0", "author": "Polygonal Mind" }
   ]
 }

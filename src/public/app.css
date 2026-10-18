@@ -1,3 +1,7 @@
+/* Every display rule below would otherwise beat the hidden attribute, which
+   has hidden buttons twice already; one rule for all of them. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #000;
   --fg: #fff;
@@ -80,8 +84,6 @@ button, input, select { font: inherit; }
   background: none; border: 0; color: var(--fg); cursor: pointer; padding: 0;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
 }
-/* display: flex above would otherwise beat the hidden attribute */
-.rail button[hidden] { display: none; }
 .rail .icon { font-size: 1.9rem; line-height: 1; }
 .rail .count { font-size: 0.78rem; font-weight: 600; }
 .rail .like[aria-pressed="true"] .icon { color: var(--accent); }
@@ -181,7 +183,6 @@ button, input, select { font: inherit; }
 }
 .controls[hidden], .post[hidden] { display: none; }
 .pickers { display: flex; gap: 0.6rem; }
-.avatar-upload[hidden] { display: none; }
 .avatar-upload { display: flex; gap: 0.5rem; justify-content: center; }
 .pill.small { font-size: 0.75rem; padding: 0.35rem 0.8rem; }
 .pill input[type="file"] { display: none; }
@@ -214,3 +215,12 @@ body.doc .bottom-nav a.active { color: #161823; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.room { width: 100%; max-width: 30rem; font-size: 0.8rem; color: var(--muted); }
+.room summary { cursor: pointer; text-align: center; color: var(--fg); }
+.room .row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; align-items: center; margin: 0.4rem 0; }
+.room select { background: rgb(255 255 255 / 0.12); color: var(--fg); border: 0; border-radius: 0.5rem; padding: 0.25rem; }
+.room select option { color: #000; }
+.room .tag { font-size: 0.65rem; padding: 0.05rem 0.4rem; border-radius: 0.5rem; background: rgb(255 255 255 / 0.15); }
+.room .consent { background: rgb(255 255 255 / 0.08); border-radius: 0.7rem; padding: 0.6rem; margin: 0.4rem 0; color: var(--fg); }
+.room .consent p { margin: 0 0 0.4rem; }

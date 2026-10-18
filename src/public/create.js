@@ -1,4 +1,5 @@
-import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
+import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, faceIn, loadAvatar, loadTracker, track, webglAvailable } from "./avatar.js";
+import { DEFAULT_STYLE, STYLES, portrait, stylise } from "./room.js";
 import { me, save } from "./me.js";
 
 const MAX_SECONDS = 30;
@@ -34,7 +35,7 @@ async function loadModels() {
     .then((r) => r.json())
     .catch(() => ({ models: [] }));
   for (const m of manifest.models) {
-    models.set(m.id, { id: m.id, name: m.name, url: `/assets/models/${m.file}`, faceTracking: true, mine: false });
+    models.set(m.id, { id: m.id, name: m.name, url: `/assets/models/${m.file}`, faceTracking: true, mine: false, roomStyle: m.roomStyle });
   }
   const mine = await fetch("/avatars")
     .then((r) => (r.ok ? r.json() : []))
@@ -64,6 +65,10 @@ function selectModel() {
     localStorage.setItem(MODEL_KEY, lookSelect.value);
   } catch {}
   if (!model) return;
+  if (room.photo && !room.styleTouched && STYLES[model.roomStyle]) {
+    roomStyle.value = model.roomStyle;
+    restyleRoom();
+  }
   modelStatus.textContent = model.faceTracking
     ? ""
     : "Preview only: this model has no humanoid head, so it can't follow your face.";
@@ -117,6 +122,104 @@ modelDelete.addEventListener("click", async () => {
 if (!webglAvailable) modelStatus.textContent = "This browser can't draw 3D avatars. Camera and Upload still work.";
 loadModels();
 worldSelect.append(...WORLDS.map((w) => new Option(w, w)));
+
+// --- Transform my room (a 2D photo background; see room.js) -------------
+const roomEl = {
+  snap: document.getElementById("room-snap"),
+  file: document.getElementById("room-file"),
+  styling: document.getElementById("room-styling"),
+  ai: document.getElementById("room-ai"),
+  clear: document.getElementById("room-clear"),
+  consent: document.getElementById("room-consent"),
+  consentText: document.getElementById("room-consent-text"),
+  consentYes: document.getElementById("room-consent-yes"),
+  consentNo: document.getElementById("room-consent-no"),
+  status: document.getElementById("room-status"),
+};
+const roomStyle = document.getElementById("room-style");
+roomStyle.append(...Object.entries(STYLES).map(([key, st]) => new Option(st.name, key)));
+roomStyle.value = DEFAULT_STYLE;
+const ROOM_PHOTO = "room";
+const room = { photo: null, filtered: null, ai: null, styleTouched: false };
+
+// The picture behind the avatar right now: an AI result if there is one for
+// this style, otherwise the on-device filter.
+const roomBackdrop = () => (room.ai?.style === roomStyle.value ? room.ai.image : room.filtered);
+
+function restyleRoom() {
+  if (!room.photo) return;
+  room.filtered = stylise(room.photo, roomStyle.value);
+  roomEl.status.textContent =
+    room.ai?.style === roomStyle.value
+      ? `Showing the AI-restyled room (${room.ai.provider}).`
+      : "Showing your room with an on-device colour filter (not AI). The photo hasn't left this device.";
+}
+
+function useRoomPhoto(source) {
+  room.photo = portrait(source);
+  room.ai = null;
+  const face = faceIn(room.photo);
+  restyleRoom();
+  if (face) roomEl.status.textContent = "There's a face in this photo. Anyone in it will be in your video: retake it with the room empty.";
+  roomEl.styling.hidden = false;
+  if (![...worldSelect.options].some((o) => o.value === ROOM_PHOTO)) {
+    worldSelect.append(new Option("My room (photo)", ROOM_PHOTO));
+  }
+  worldSelect.value = ROOM_PHOTO;
+  updateHint();
+}
+
+roomStyle.addEventListener("change", () => {
+  room.styleTouched = true;
+  restyleRoom();
+});
+
+roomEl.snap.addEventListener("click", async () => {
+  if (!(await startCamera())) return;
+  roomEl.snap.disabled = true;
+  for (let n = 5; n > 0; n--) {
+    roomEl.status.textContent = `Step out of frame… ${n}`;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  roomEl.snap.disabled = false;
+  if (camera.readyState < 2) {
+    roomEl.status.textContent = "The camera isn't ready. Try again.";
+    return;
+  }
+  // Mirrored like the selfie view, so it matches what you saw.
+  const c = document.createElement("canvas");
+  c.width = camera.videoWidth;
+  c.height = camera.videoHeight;
+  const cctx = c.getContext("2d");
+  cctx.translate(c.width, 0);
+  cctx.scale(-1, 1);
+  cctx.drawImage(camera, 0, 0);
+  useRoomPhoto(c);
+});
+
+roomEl.file.addEventListener("change", async () => {
+  const file = roomEl.file.files?.[0];
+  roomEl.file.value = "";
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    roomEl.status.textContent = "That picture is over 10 MB.";
+    return;
+  }
+  try {
+    useRoomPhoto(await createImageBitmap(file));
+  } catch {
+    roomEl.status.textContent = "That file isn't a picture this browser can open.";
+  }
+});
+
+roomEl.clear.addEventListener("click", () => {
+  Object.assign(room, { photo: null, filtered: null, ai: null, styleTouched: false });
+  roomEl.styling.hidden = true;
+  roomEl.consent.hidden = true;
+  roomEl.status.textContent = "";
+  worldSelect.querySelector(`option[value="${ROOM_PHOTO}"]`)?.remove();
+  updateHint();
+});
 postForm.elements.namedItem("avatar").value = me.avatar;
 postForm.elements.namedItem("name").value = me.name;
 
@@ -175,7 +278,9 @@ function updateHint() {
       ? "Camera mode: records what your camera sees."
       : worldSelect.value === LIVE_CAMERA
         ? "Live camera: your real camera, blurred, is recorded behind the avatar. You, your face and your room can still be recognised in the clip."
-        : "Avatar mode: your face is tracked on this device. Only the avatar is recorded.";
+        : worldSelect.value === ROOM_PHOTO
+          ? "Room photo: your face is tracked on this device. The avatar and your room photo are recorded."
+          : "Avatar mode: your face is tracked on this device. Only the avatar is recorded.";
 }
 worldSelect.addEventListener("change", updateHint);
 
@@ -230,7 +335,8 @@ function frame(t) {
           pose = track(camera, t);
         } catch {}
       }
-      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, camera, t, pose });
+      const backdrop = worldSelect.value === ROOM_PHOTO ? roomBackdrop() : null;
+      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, backdrop, camera, t, pose });
     } else if (mode === "camera") {
       drawCameraScene(ctx, camera);
     }

@@ -137,6 +137,27 @@ export function renderCreate() {
           <button type="button" class="pill ghost small" id="model-delete" hidden>Delete this avatar</button>
         </div>
         <p class="hint" id="model-status" role="status"></p>
+        <details class="room" id="room">
+          <summary>Transform my room <span class="tag">2D photo</span></summary>
+          <p class="hint">A still photo of your room, restyled to suit your avatar and shown behind it. It's a flat picture, not a 3D world. Step out of frame first: anyone in the photo ends up in your video.</p>
+          <div class="row">
+            <button type="button" class="pill ghost small" id="room-snap">Take photo in 5 s</button>
+            <label class="pill ghost small">Use a picture<input type="file" id="room-file" accept="image/jpeg,image/png,image/webp" /></label>
+          </div>
+          <div class="row" id="room-styling" hidden>
+            <label>Style <select id="room-style"></select></label>
+            <button type="button" class="pill ghost small" id="room-ai" hidden>Restyle with AI…</button>
+            <button type="button" class="pill ghost small" id="room-clear">Remove</button>
+          </div>
+          <div class="consent" id="room-consent" hidden>
+            <p id="room-consent-text"></p>
+            <div class="row">
+              <button type="button" class="pill small" id="room-consent-yes">Send this photo</button>
+              <button type="button" class="pill ghost small" id="room-consent-no">Cancel</button>
+            </div>
+          </div>
+          <p class="hint" id="room-status" role="status"></p>
+        </details>
         <button type="button" class="record" id="record" aria-label="start recording" disabled><span></span></button>
         <p class="hint" id="privacy-hint">Avatar mode: your face is tracked on this device. Only the avatar is recorded.</p>
       </div>

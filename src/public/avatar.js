@@ -30,6 +30,16 @@ export async function loadTracker() {
   return landmarker;
 }
 
+// Is there a face in this still image? Used to warn before a room photo with
+// someone in it becomes a background. Only says yes when it's sure; a "no"
+// means no face was found, not that no person is there.
+let stillTime = 0;
+export function faceIn(image) {
+  if (!landmarker) return null; // can't tell
+  stillTime = Math.max(performance.now(), stillTime + 1);
+  return Boolean(landmarker.detectForVideo(image, stillTime).faceLandmarks?.length);
+}
+
 // Face parameters, normalised and smoothed. Landmarks are mirrored first so
 // the character moves like a reflection: lean left, it leans left.
 const pose = { x: 0.5, y: 0.45, scale: 1, roll: 0, yaw: 0, pitch: 0, blinkL: 0, blinkR: 0, jaw: 0, smile: 0, brows: 0, found: false };
@@ -325,9 +335,12 @@ function drawCharacter(ctx, url, s, w, h, t) {
 
 // `model` is the URL of the avatar to draw: a built-in under /assets/models/
 // or an upload under /avatar-files/.
-export function drawAvatarScene(ctx, { model, world, camera, t, pose: tracked }) {
+// `backdrop`, if given, is a picture (a canvas or loaded image) drawn instead
+// of a standard world: a room photo, filtered or AI-styled.
+export function drawAvatarScene(ctx, { model, world, backdrop, camera, t, pose: tracked }) {
   const { width: w, height: h } = ctx.canvas;
-  drawWorld(ctx, world, w, h, t, camera);
+  if (backdrop) ctx.drawImage(backdrop, 0, 0, w, h);
+  else drawWorld(ctx, world, w, h, t, camera);
   drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t);
 }
 
