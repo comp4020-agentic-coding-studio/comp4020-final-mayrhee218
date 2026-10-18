@@ -1,6 +1,6 @@
 # 2. Who may change what: a person is a browser, and only owners delete
 
-- **Status:** proposed (crit 10)
+- **Status:** accepted (crit 10)
 - **Date:** 2026-10-18
 
 ## Context

@@ -1,6 +1,6 @@
 # 3. Your own 3D avatar: VRM uploads, checked on the server, kept private
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-18
 
 ## Context
