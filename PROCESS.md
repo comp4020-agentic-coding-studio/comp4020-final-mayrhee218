@@ -117,11 +117,106 @@ the code:
   post anything; the posting tests run in CI against throwaway data, so the feed
   my pod sees isn't full of test videos.
 
+## Telling People Apart (Crit 10)
+
+Crit 10 asks the app to tell people apart, to decide **on the server** what
+each person may see and change, and to log who did what, so I can narrate a
+crit from `flyctl logs` without touching the app.
+
+### What was wrong before
+
+Reading the code against that spec showed the server believed whatever a
+request said about who sent it. The name and avatar came in the request body,
+and a like was keyed by a `clientId` the page made up. Anyone could post under
+anyone's name, and one browser could like a video as many times as it had ids
+to send. Nothing could be deleted, so there was no "yours" to protect.
+
+### The decision
+
+The full record is `docs/decisions/0002-who-may-change-what.md`. In short:
+
+- **A person is a browser.** On the first visit the server sets an
+  `HttpOnly` cookie with a random 128-bit token. That cookie is the only proof
+  of who you are. Everyone else sees a **handle**, a hash of the token, on what
+  you post. Seeing someone's handle doesn't let you act as them.
+- **Name and avatar are labels, not identity.** Two people can both be "mia";
+  the handle tells them apart.
+- **Only owners delete.** A video can be deleted only by its poster. A comment
+  can be deleted by its writer or by the poster of the video it's under. A
+  like counts once per person. Who liked a video stays private.
+
+I chose an anonymous browser over accounts because my pod gets only the URL:
+each Chrome profile becomes a separate person with no sign-up step, the way
+TikTok lets you watch without an account.
+
+### Red to green
+
+I wrote `spec/permissions.test.ts` before changing the server and ran it
+against the old one: all four tests failed because no identity cookie was
+handed out. They check that two browsers get different handles, that a
+stranger's delete is refused with `403`, that a comment's writer and the
+video's poster can both delete it, and that a browser's like counts once
+whatever id it claims. The identity, the rules and the tests landed together
+in [`5faf5ee`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/5faf5ee). The red run happened locally, not as its own
+commit.
+
+The page hides delete buttons you can't use, but that's only manners: the
+`403` comes from the server either way, which is what the tests check.
+
+### Logging who did what
+
+[`6171c3f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6171c3f) prints one line per action, led by the person's
+name, avatar and handle, and naming whose video was touched:
+
+```
+kai🐧#cdc_xHODhY liked video 4dcd8d61 (mia🦊#QzgBhugnct's) → 1 like
+kai🐧#cdc_xHODhY REFUSED delete video 4dcd8d61 (mia🦊#QzgBhugnct's)
+mia🦊#QzgBhugnct deleted video 4dcd8d61 "first try"
+```
+
+Posts, likes, comments, deletes, refused deletes, failed uploads, arrivals
+and departures are all logged. Only the public handle is printed, never the
+cookie token, so the log is safe to put on screen at the crit. The logging
+stays after the crit: it's what I'll read when the deployed app misbehaves.
+
+### Corrections along the way
+
+- **Likes and deletes carry no name**, so their log lines first showed a bare
+  handle. The server now remembers the last name each handle used, so those
+  lines read as a person.
+- **A restart would have forgotten every name.** The name list is now seeded
+  from the stored videos and comments at boot.
+- **Test clients with no cookie logged as "nobody"**, which reads like a bug
+  at a crit. They now show as `(no cookie)`. A real browser always has a
+  cookie.
+- **I broke my own rule about the live feed.** To check the deploy, the full
+  spec ran against the live URL, and it posts test clips, captioned `spec-…`.
+  The crit 9 section above says only tests that don't post should run against
+  the live app. Those clips have to be cleared before my pod opens the feed.
+- **The rehearsal caught what the spec couldn't.** I ran the crit's script in
+  two isolated Chrome contexts, with separate cookies standing in for two
+  profiles, against a local copy with throwaway data. Mia posted, Kai
+  commented and liked, Kai forged a second like and a delete by hand, and Mia
+  deleted her clip. The server side held: the forged like left the count at 1,
+  the delete got a `403` and a `REFUSED` line, and the clip vanished from
+  Kai's feed live. The page didn't hold. **Kai saw a delete button on Mia's
+  clip**, because the CSS rule `.rail button { display: flex }` beat the
+  `hidden` attribute. Every page also threw an error when the empty-feed
+  placeholder, which has no delete button, got the same treatment. All the
+  spec tests were green throughout, because they check the server over HTTP
+  and never render a page. Both bugs are fixed and the rehearsal reruns clean.
+  It's the crit 9 lesson again: green tests are not a working page. The fix is
+  [`6412c49`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6412c49).
+
 ## Known Limits
 
-- **No accounts.** Names are self-chosen, likes are counted per device, and
-  anyone with the link can post. There's no delete, report or moderation yet.
-  That's acceptable for a crit, but not for an open platform.
+- **A person is a browser, not a human.** Clearing cookies or opening another
+  profile makes you someone new, and you lose the power to delete what you
+  posted before. Your phone and laptop are two people.
+- **Old posts have no owner.** Videos and comments from before crit 10 can't
+  be deleted by anyone.
+- **No moderation.** You can delete your own things, but nobody can remove
+  someone else's video. That needs accounts and an owner role.
 - **The avatar is 2D and face-only.** There's no 3D model, VRM upload or body
   tracking yet, and webcam tracking is not professional motion capture.
 - **No AI environments or 2D-to-3D conversion.** Those need GPU infrastructure
@@ -133,7 +228,7 @@ the code:
 
 ## Next
 
-- Decide and write down how presence should work when several people use the
-  app at once, with the options I considered and what my choice costs.
-- Crit 10, and toward A3: a 3D avatar, and the account and moderation basics an
-  open platform needs.
+- Toward A3: a sign-in (email link or passkey) so a person can keep their
+  videos across devices, with the handle carrying over.
+- An owner role that can remove anything, logged like every other action.
+- A 3D avatar.
