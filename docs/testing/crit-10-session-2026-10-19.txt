@@ -1,0 +1,349 @@
+2026-10-19T03:13:00Z [JOIN]     Person A connected to /live (1 open)
+2026-10-19T03:13:00Z [SNAPSHOT] → Person A welcome + presence: 0 here
+2026-10-19T03:13:00Z [RECV]     Person A socket hello (r:83a1)
+2026-10-19T03:13:00Z [JOIN]     Person A joined the room (1 here) (r:83a1)
+2026-10-19T03:13:00Z [BCAST]    presence: 1 here → 1 socket (r:83a1)
+2026-10-19T03:13:08Z [SNAPSHOT] → Person B feed page: 1 video
+2026-10-19T03:13:29Z [SNAPSHOT] → Person C feed page: 1 video
+2026-10-19T03:17:13Z [SNAPSHOT] → Person D feed page: 1 video
+2026-10-19T03:17:14Z [JOIN]     Person D connected to /live (2 open)
+2026-10-19T03:17:14Z [SNAPSHOT] → Person D welcome + presence: 1 here
+2026-10-19T03:17:14Z [RECV]     Person D socket hello (r:f174)
+2026-10-19T03:17:14Z [JOIN]     Person D joined the room (2 here) (r:f174)
+2026-10-19T03:17:14Z [BCAST]    presence: 2 here → 2 sockets (r:f174)
+2026-10-19T03:17:28Z [LEAVE]    Person A left the room (1 here) (r:9e41)
+2026-10-19T03:17:28Z [BCAST]    presence: 1 here → 1 socket (r:9e41)
+2026-10-19T03:17:34Z [SNAPSHOT] → Person E feed page: 1 video
+2026-10-19T03:17:34Z [JOIN]     Person E connected to /live (2 open)
+2026-10-19T03:17:34Z [SNAPSHOT] → Person E welcome + presence: 1 here
+2026-10-19T03:17:34Z [RECV]     Person E socket hello (r:d9b6)
+2026-10-19T03:17:34Z [JOIN]     Person E joined the room (2 here) (r:d9b6)
+2026-10-19T03:17:34Z [BCAST]    presence: 2 here → 2 sockets (r:d9b6)
+2026-10-19T03:17:43Z [RECV]     Person F POST /videos (r:190b)
+2026-10-19T03:17:43Z [DONE]     Person F posted video 6864287b "[text]" [avatar, 295 KB] (r:190b)
+2026-10-19T03:17:43Z [BCAST]    video 6864287b → 2 sockets (r:190b)
+2026-10-19T03:17:43Z [SNAPSHOT] → Person F feed page: 2 videos
+2026-10-19T03:17:43Z [JOIN]     Person F connected to /live (3 open)
+2026-10-19T03:17:43Z [SNAPSHOT] → Person F welcome + presence: 2 here
+2026-10-19T03:17:43Z [RECV]     Person E POST /videos/6864287b/like (r:aab8)
+2026-10-19T03:17:43Z [RECV]     Person F socket hello (r:aa28)
+2026-10-19T03:17:43Z [JOIN]     Person F joined the room (3 here) (r:aa28)
+2026-10-19T03:17:43Z [BCAST]    presence: 3 here → 3 sockets (r:aa28)
+2026-10-19T03:17:43Z [DONE]     Person E liked video 6864287b (Person F's) → 1 like (r:aab8)
+2026-10-19T03:17:43Z [BCAST]    likes 6864287b = 1 → 3 sockets (r:aab8)
+2026-10-19T03:17:43Z [RECV]     Person E POST /videos/6864287b/comments (r:b91f)
+2026-10-19T03:17:43Z [DONE]     Person E commented on video 6864287b (Person F's): "[text]" (r:b91f)
+2026-10-19T03:17:43Z [BCAST]    comment 6864287b → 3 sockets (r:b91f)
+2026-10-19T03:17:44Z [RECV]     Person E DELETE /videos/6864287b (r:cc89)
+2026-10-19T03:17:44Z [REJECT]   Person E DELETE /videos/6864287b: 403 that video isn't yours to delete (Person F's) (r:cc89)
+2026-10-19T03:17:44Z [RECV]     Person F DELETE /videos/6864287b (r:a440)
+2026-10-19T03:17:44Z [DONE]     Person F deleted video 6864287b "[text]" (r:a440)
+2026-10-19T03:17:44Z [BCAST]    video-removed 6864287b → 3 sockets (r:a440)
+2026-10-19T03:17:44Z [SNAPSHOT] → Person G feed page: 1 video
+2026-10-19T03:17:44Z [LEAVE]    Person E left the room (2 here) (r:3b9a)
+2026-10-19T03:17:44Z [BCAST]    presence: 2 here → 2 sockets (r:3b9a)
+2026-10-19T03:17:44Z [LEAVE]    Person F left the room (1 here) (r:9f8d)
+2026-10-19T03:17:44Z [BCAST]    presence: 1 here → 1 socket (r:9f8d)
+2026-10-19T03:18:54Z [SNAPSHOT] → Person D feed page: 1 video
+2026-10-19T03:18:54Z [LEAVE]    Person D left the room (0 here) (r:0c6d)
+2026-10-19T03:18:54Z [BCAST]    presence: 0 here → 0 sockets (r:0c6d)
+2026-10-19T03:18:54Z [JOIN]     Person D connected to /live (1 open)
+2026-10-19T03:18:54Z [SNAPSHOT] → Person D welcome + presence: 0 here
+2026-10-19T03:18:54Z [RECV]     Person D socket hello (r:cce9)
+2026-10-19T03:18:54Z [JOIN]     Person D joined the room (1 here) (r:cce9)
+2026-10-19T03:18:54Z [BCAST]    presence: 1 here → 1 socket (r:cce9)
+2026-10-19T03:18:56Z [SNAPSHOT] → Person D feed page: 1 video
+2026-10-19T03:18:56Z [LEAVE]    Person D left the room (0 here) (r:d5b7)
+2026-10-19T03:18:56Z [BCAST]    presence: 0 here → 0 sockets (r:d5b7)
+2026-10-19T03:18:56Z [JOIN]     Person D connected to /live (1 open)
+2026-10-19T03:18:56Z [SNAPSHOT] → Person D welcome + presence: 0 here
+2026-10-19T03:18:56Z [RECV]     Person D socket hello (r:714b)
+2026-10-19T03:18:56Z [JOIN]     Person D joined the room (1 here) (r:714b)
+2026-10-19T03:18:56Z [BCAST]    presence: 1 here → 1 socket (r:714b)
+2026-10-19T03:19:16Z [SNAPSHOT] → Person H feed page: 1 video
+2026-10-19T03:22:56Z [JOIN]     Person D connected to /live (1 open)
+2026-10-19T03:22:56Z [SNAPSHOT] → Person D welcome + presence: 0 here
+2026-10-19T03:22:56Z [RECV]     Person D socket hello (r:c542)
+2026-10-19T03:22:56Z [JOIN]     Person D joined the room (1 here) (r:c542)
+2026-10-19T03:22:56Z [BCAST]    presence: 1 here → 1 socket (r:c542)
+2026-10-19T03:23:05Z [SNAPSHOT] → Person I feed page: 1 video
+2026-10-19T03:23:15Z [SNAPSHOT] → Person J feed page: 1 video
+2026-10-19T03:24:02Z [LEAVE]    Person D left the room (0 here) (r:c447)
+2026-10-19T03:24:02Z [BCAST]    presence: 0 here → 0 sockets (r:c447)
+2026-10-19T03:25:09Z [SNAPSHOT] → Person K feed page: 1 video
+2026-10-19T03:25:09Z [JOIN]     Person K connected to /live (1 open)
+2026-10-19T03:25:09Z [SNAPSHOT] → Person K welcome + presence: 0 here
+2026-10-19T03:25:09Z [RECV]     Person K socket hello (r:ce48)
+2026-10-19T03:25:09Z [JOIN]     Person K joined the room (1 here) (r:ce48)
+2026-10-19T03:25:09Z [BCAST]    presence: 1 here → 1 socket (r:ce48)
+2026-10-19T03:25:30Z [SNAPSHOT] → Person L feed page: 1 video
+2026-10-19T03:25:30Z [JOIN]     Person L connected to /live (2 open)
+2026-10-19T03:25:30Z [SNAPSHOT] → Person L welcome + presence: 1 here
+2026-10-19T03:25:30Z [RECV]     Person L socket hello (r:0412)
+2026-10-19T03:25:30Z [JOIN]     Person L joined the room (2 here) (r:0412)
+2026-10-19T03:25:30Z [BCAST]    presence: 2 here → 2 sockets (r:0412)
+2026-10-19T03:26:01Z [SNAPSHOT] → Person M feed page: 1 video
+2026-10-19T03:26:01Z [JOIN]     Person M connected to /live (3 open)
+2026-10-19T03:26:01Z [SNAPSHOT] → Person M welcome + presence: 2 here
+2026-10-19T03:26:01Z [RECV]     Person M socket hello (r:69e4)
+2026-10-19T03:26:01Z [JOIN]     Person M joined the room (3 here) (r:69e4)
+2026-10-19T03:26:01Z [BCAST]    presence: 3 here → 3 sockets (r:69e4)
+2026-10-19T03:26:15Z [LEAVE]    Person L left the room (2 here) (r:5bab)
+2026-10-19T03:26:15Z [BCAST]    presence: 2 here → 2 sockets (r:5bab)
+2026-10-19T03:26:15Z [SNAPSHOT] → Person N feed page: 1 video
+2026-10-19T03:26:15Z [JOIN]     Person N connected to /live (3 open)
+2026-10-19T03:26:15Z [SNAPSHOT] → Person N welcome + presence: 2 here
+2026-10-19T03:26:15Z [RECV]     Person N socket hello (r:e78b)
+2026-10-19T03:26:15Z [JOIN]     Person N joined the room (3 here) (r:e78b)
+2026-10-19T03:26:15Z [BCAST]    presence: 3 here → 3 sockets (r:e78b)
+2026-10-19T03:26:30Z [SNAPSHOT] → Person L feed page: 1 video
+2026-10-19T03:26:31Z [JOIN]     Person L connected to /live (4 open)
+2026-10-19T03:26:31Z [SNAPSHOT] → Person L welcome + presence: 3 here
+2026-10-19T03:26:31Z [RECV]     Person L socket hello (r:5c3e)
+2026-10-19T03:26:31Z [JOIN]     Person L joined the room (4 here) (r:5c3e)
+2026-10-19T03:26:31Z [BCAST]    presence: 4 here → 4 sockets (r:5c3e)
+2026-10-19T03:26:37Z [RECV]     Person L POST /videos/c24ca245/like (r:f0ee)
+2026-10-19T03:26:37Z [DONE]     Person L liked video c24ca245 (Person A's) → 2 likes (r:f0ee)
+2026-10-19T03:26:37Z [BCAST]    likes c24ca245 = 2 → 4 sockets (r:f0ee)
+2026-10-19T03:26:39Z [LEAVE]    Person N left the room (3 here) (r:e70b)
+2026-10-19T03:26:39Z [BCAST]    presence: 3 here → 3 sockets (r:e70b)
+2026-10-19T03:26:47Z [SNAPSHOT] → Person D feed page: 1 video
+2026-10-19T03:26:47Z [JOIN]     Person D connected to /live (4 open)
+2026-10-19T03:26:47Z [SNAPSHOT] → Person D welcome + presence: 3 here
+2026-10-19T03:26:47Z [RECV]     Person D socket hello (r:c461)
+2026-10-19T03:26:47Z [JOIN]     Person D joined the room (4 here) (r:c461)
+2026-10-19T03:26:47Z [BCAST]    presence: 4 here → 4 sockets (r:c461)
+2026-10-19T03:26:55Z [RECV]     Person L socket hello (r:ecca)
+2026-10-19T03:26:55Z [JOIN]     Person L changed their name or avatar (r:ecca)
+2026-10-19T03:26:55Z [BCAST]    presence: 4 here → 4 sockets (r:ecca)
+2026-10-19T03:26:55Z [RECV]     Person L POST /videos/c24ca245/comments (r:0d50)
+2026-10-19T03:26:55Z [DONE]     Person L commented on video c24ca245 (Person A's): "[text]" (r:0d50)
+2026-10-19T03:26:55Z [BCAST]    comment c24ca245 → 4 sockets (r:0d50)
+2026-10-19T03:27:08Z [RECV]     Person D POST /worlds (r:9c48)
+2026-10-19T03:27:08Z [DONE]     Person D uploaded world 0de55bdf "[text]" [23 KB] (r:9c48)
+2026-10-19T03:27:09Z [SNAPSHOT] → Person K feed page: 1 video
+2026-10-19T03:27:10Z [JOIN]     Person K connected to /live (5 open)
+2026-10-19T03:27:10Z [SNAPSHOT] → Person K welcome + presence: 4 here
+2026-10-19T03:27:10Z [RECV]     Person K socket hello (r:9b58)
+2026-10-19T03:27:10Z [JOIN]     Person K joined the room (5 here) (r:9b58)
+2026-10-19T03:27:10Z [BCAST]    presence: 5 here → 5 sockets (r:9b58)
+2026-10-19T03:27:12Z [RECV]     Person K POST /videos/c24ca245/like (r:6a21)
+2026-10-19T03:27:12Z [DONE]     Person K liked video c24ca245 (Person A's) → 3 likes (r:6a21)
+2026-10-19T03:27:12Z [BCAST]    likes c24ca245 = 3 → 4 sockets (r:6a21)
+2026-10-19T03:27:15Z [LEAVE]    Person L left the room (4 here) (r:2483)
+2026-10-19T03:27:15Z [BCAST]    presence: 4 here → 4 sockets (r:2483)
+2026-10-19T03:27:20Z [SNAPSHOT] → Person L feed page: 1 video
+2026-10-19T03:27:20Z [JOIN]     Person L connected to /live (5 open)
+2026-10-19T03:27:20Z [SNAPSHOT] → Person L welcome + presence: 4 here
+2026-10-19T03:27:20Z [RECV]     Person L socket hello (r:369b)
+2026-10-19T03:27:20Z [JOIN]     Person L joined the room (5 here) (r:369b)
+2026-10-19T03:27:20Z [BCAST]    presence: 5 here → 5 sockets (r:369b)
+2026-10-19T03:27:22Z [LEAVE]    Person M left the room (4 here) (r:7985)
+2026-10-19T03:27:22Z [BCAST]    presence: 4 here → 4 sockets (r:7985)
+2026-10-19T03:27:27Z [JOIN]     Person L connected to /live (5 open)
+2026-10-19T03:27:27Z [SNAPSHOT] → Person L welcome + presence: 4 here
+2026-10-19T03:27:27Z [RECV]     Person L socket hello (r:608f)
+2026-10-19T03:27:27Z [JOIN]     Person L joined the room (5 here) (r:608f)
+2026-10-19T03:27:27Z [BCAST]    presence: 5 here → 5 sockets (r:608f)
+2026-10-19T03:27:35Z [RECV]     Person L POST /videos/c24ca245/comments (r:1b97)
+2026-10-19T03:27:35Z [DONE]     Person L commented on video c24ca245 (Person A's): "[text]" (r:1b97)
+2026-10-19T03:27:35Z [BCAST]    comment c24ca245 → 5 sockets (r:1b97)
+2026-10-19T03:27:41Z [SNAPSHOT] → Person O feed page: 1 video
+2026-10-19T03:27:41Z [JOIN]     Person O connected to /live (6 open)
+2026-10-19T03:27:41Z [SNAPSHOT] → Person O welcome + presence: 5 here
+2026-10-19T03:27:41Z [RECV]     Person O socket hello (r:4aa5)
+2026-10-19T03:27:41Z [JOIN]     Person O joined the room (6 here) (r:4aa5)
+2026-10-19T03:27:41Z [BCAST]    presence: 6 here → 6 sockets (r:4aa5)
+2026-10-19T03:27:44Z [RECV]     Person O POST /videos/c24ca245/like (r:a370)
+2026-10-19T03:27:44Z [DONE]     Person O liked video c24ca245 (Person A's) → 4 likes (r:a370)
+2026-10-19T03:27:44Z [BCAST]    likes c24ca245 = 4 → 6 sockets (r:a370)
+2026-10-19T03:27:53Z [RECV]     Person O socket hello (r:c805)
+2026-10-19T03:27:53Z [JOIN]     Person O changed their name or avatar (r:c805)
+2026-10-19T03:27:53Z [BCAST]    presence: 6 here → 6 sockets (r:c805)
+2026-10-19T03:27:53Z [RECV]     Person O POST /videos/c24ca245/comments (r:2edd)
+2026-10-19T03:27:53Z [DONE]     Person O commented on video c24ca245 (Person A's): "[text]" (r:2edd)
+2026-10-19T03:27:53Z [BCAST]    comment c24ca245 → 6 sockets (r:2edd)
+2026-10-19T03:27:56Z [RECV]     Person N POST /videos (r:711b)
+2026-10-19T03:27:56Z [DONE]     Person N posted video 06080f86 "[text]" [avatar, 601 KB] (r:711b)
+2026-10-19T03:27:56Z [BCAST]    video 06080f86 → 6 sockets (r:711b)
+2026-10-19T03:27:56Z [SNAPSHOT] → Person N feed page: 2 videos
+2026-10-19T03:27:56Z [JOIN]     Person N connected to /live (7 open)
+2026-10-19T03:27:56Z [SNAPSHOT] → Person N welcome + presence: 6 here
+2026-10-19T03:27:56Z [RECV]     Person N socket hello (r:2a9b)
+2026-10-19T03:27:56Z [JOIN]     Person N joined the room (7 here) (r:2a9b)
+2026-10-19T03:27:56Z [BCAST]    presence: 7 here → 7 sockets (r:2a9b)
+2026-10-19T03:27:56Z [LEAVE]    Person D left the room (6 here) (r:1344)
+2026-10-19T03:27:56Z [BCAST]    presence: 6 here → 6 sockets (r:1344)
+2026-10-19T03:28:11Z [SNAPSHOT] → Person M feed page: 2 videos
+2026-10-19T03:28:11Z [JOIN]     Person M connected to /live (7 open)
+2026-10-19T03:28:11Z [SNAPSHOT] → Person M welcome + presence: 6 here
+2026-10-19T03:28:11Z [RECV]     Person M socket hello (r:c117)
+2026-10-19T03:28:11Z [JOIN]     Person M joined the room (7 here) (r:c117)
+2026-10-19T03:28:11Z [BCAST]    presence: 7 here → 7 sockets (r:c117)
+2026-10-19T03:28:19Z [RECV]     Person K socket hello (r:4647)
+2026-10-19T03:28:19Z [JOIN]     Person K changed their name or avatar (r:4647)
+2026-10-19T03:28:19Z [BCAST]    presence: 7 here → 7 sockets (r:4647)
+2026-10-19T03:28:19Z [RECV]     Person K POST /videos/c24ca245/comments (r:d4a8)
+2026-10-19T03:28:19Z [DONE]     Person K commented on video c24ca245 (Person A's): "[text]" (r:d4a8)
+2026-10-19T03:28:19Z [BCAST]    comment c24ca245 → 7 sockets (r:d4a8)
+2026-10-19T03:28:31Z [SNAPSHOT] → Person D feed page: 2 videos
+2026-10-19T03:28:31Z [JOIN]     Person D connected to /live (8 open)
+2026-10-19T03:28:31Z [SNAPSHOT] → Person D welcome + presence: 7 here
+2026-10-19T03:28:31Z [RECV]     Person D socket hello (r:3064)
+2026-10-19T03:28:31Z [JOIN]     Person D joined the room (8 here) (r:3064)
+2026-10-19T03:28:31Z [BCAST]    presence: 8 here → 8 sockets (r:3064)
+2026-10-19T03:28:32Z [SNAPSHOT] → Person D feed page: 2 videos
+2026-10-19T03:28:32Z [LEAVE]    Person D left the room (7 here) (r:9ece)
+2026-10-19T03:28:32Z [BCAST]    presence: 7 here → 7 sockets (r:9ece)
+2026-10-19T03:28:33Z [JOIN]     Person D connected to /live (8 open)
+2026-10-19T03:28:33Z [SNAPSHOT] → Person D welcome + presence: 7 here
+2026-10-19T03:28:33Z [RECV]     Person D socket hello (r:228b)
+2026-10-19T03:28:33Z [JOIN]     Person D joined the room (8 here) (r:228b)
+2026-10-19T03:28:33Z [BCAST]    presence: 8 here → 8 sockets (r:228b)
+2026-10-19T03:28:39Z [RECV]     Person M POST /videos (r:ae34)
+2026-10-19T03:28:39Z [DONE]     Person M posted video 35aed795 "[text]" [avatar, 368 KB] (r:ae34)
+2026-10-19T03:28:39Z [BCAST]    video 35aed795 → 8 sockets (r:ae34)
+2026-10-19T03:28:39Z [SNAPSHOT] → Person M feed page: 3 videos
+2026-10-19T03:28:40Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:28:40Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:28:40Z [RECV]     Person M socket hello (r:e7da)
+2026-10-19T03:28:40Z [JOIN]     Person M joined the room (9 here) (r:e7da)
+2026-10-19T03:28:40Z [BCAST]    presence: 9 here → 9 sockets (r:e7da)
+2026-10-19T03:28:54Z [SNAPSHOT] → Person M feed page: 3 videos
+2026-10-19T03:28:54Z [LEAVE]    Person M left the room (8 here) (r:a2e3)
+2026-10-19T03:28:54Z [BCAST]    presence: 8 here → 8 sockets (r:a2e3)
+2026-10-19T03:28:54Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:28:54Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:28:54Z [RECV]     Person M socket hello (r:fd1a)
+2026-10-19T03:28:54Z [JOIN]     Person M joined the room (9 here) (r:fd1a)
+2026-10-19T03:28:54Z [BCAST]    presence: 9 here → 9 sockets (r:fd1a)
+2026-10-19T03:28:55Z [SNAPSHOT] → Person M feed page: 3 videos
+2026-10-19T03:28:55Z [LEAVE]    Person M left the room (8 here) (r:6e71)
+2026-10-19T03:28:55Z [BCAST]    presence: 8 here → 8 sockets (r:6e71)
+2026-10-19T03:28:55Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:28:55Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:28:55Z [RECV]     Person M socket hello (r:f94f)
+2026-10-19T03:28:55Z [JOIN]     Person M joined the room (9 here) (r:f94f)
+2026-10-19T03:28:55Z [BCAST]    presence: 9 here → 9 sockets (r:f94f)
+2026-10-19T03:28:55Z [SNAPSHOT] → Person M feed page: 3 videos
+2026-10-19T03:28:55Z [LEAVE]    Person M left the room (8 here) (r:0199)
+2026-10-19T03:28:55Z [BCAST]    presence: 8 here → 8 sockets (r:0199)
+2026-10-19T03:28:56Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:28:56Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:28:56Z [RECV]     Person M socket hello (r:3eae)
+2026-10-19T03:28:56Z [JOIN]     Person M joined the room (9 here) (r:3eae)
+2026-10-19T03:28:56Z [BCAST]    presence: 9 here → 9 sockets (r:3eae)
+2026-10-19T03:28:57Z [SNAPSHOT] → Person M feed page: 3 videos
+2026-10-19T03:28:57Z [LEAVE]    Person M left the room (8 here) (r:2f14)
+2026-10-19T03:28:57Z [BCAST]    presence: 8 here → 8 sockets (r:2f14)
+2026-10-19T03:28:57Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:28:57Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:28:57Z [RECV]     Person M socket hello (r:8d82)
+2026-10-19T03:28:57Z [JOIN]     Person M joined the room (9 here) (r:8d82)
+2026-10-19T03:28:57Z [BCAST]    presence: 9 here → 9 sockets (r:8d82)
+2026-10-19T03:29:07Z [RECV]     Person L POST /videos/c24ca245/comments (r:5f45)
+2026-10-19T03:29:07Z [DONE]     Person L commented on video c24ca245 (Person A's): "[text]" (r:5f45)
+2026-10-19T03:29:07Z [BCAST]    comment c24ca245 → 9 sockets (r:5f45)
+2026-10-19T03:29:08Z [RECV]     Person K POST /videos/35aed795/like (r:bd21)
+2026-10-19T03:29:08Z [DONE]     Person K liked video 35aed795 (Person M's) → 1 like (r:bd21)
+2026-10-19T03:29:08Z [BCAST]    likes 35aed795 = 1 → 9 sockets (r:bd21)
+2026-10-19T03:29:21Z [SNAPSHOT] → Person P feed page: 3 videos
+2026-10-19T03:29:40Z [SNAPSHOT] → Person K feed page: 3 videos
+2026-10-19T03:29:40Z [JOIN]     Person K connected to /live (10 open)
+2026-10-19T03:29:40Z [SNAPSHOT] → Person K welcome + presence: 9 here
+2026-10-19T03:29:40Z [RECV]     Person K socket hello (r:e981)
+2026-10-19T03:29:40Z [JOIN]     Person K joined the room (10 here) (r:e981)
+2026-10-19T03:29:40Z [BCAST]    presence: 10 here → 10 sockets (r:e981)
+2026-10-19T03:29:40Z [RECV]     Person M POST /videos/06080f86/like (r:7579)
+2026-10-19T03:29:40Z [DONE]     Person M liked video 06080f86 (Person N's) → 1 like (r:7579)
+2026-10-19T03:29:40Z [BCAST]    likes 06080f86 = 1 → 10 sockets (r:7579)
+2026-10-19T03:29:41Z [SNAPSHOT] → Person K feed page: 3 videos
+2026-10-19T03:29:41Z [LEAVE]    Person K left the room (9 here) (r:65df)
+2026-10-19T03:29:41Z [BCAST]    presence: 9 here → 9 sockets (r:65df)
+2026-10-19T03:29:41Z [JOIN]     Person K connected to /live (10 open)
+2026-10-19T03:29:41Z [SNAPSHOT] → Person K welcome + presence: 9 here
+2026-10-19T03:29:41Z [RECV]     Person K socket hello (r:5ccd)
+2026-10-19T03:29:41Z [JOIN]     Person K joined the room (10 here) (r:5ccd)
+2026-10-19T03:29:41Z [BCAST]    presence: 10 here → 10 sockets (r:5ccd)
+2026-10-19T03:29:44Z [SNAPSHOT] → Person D feed page: 3 videos
+2026-10-19T03:29:44Z [LEAVE]    Person D left the room (9 here) (r:cd8c)
+2026-10-19T03:29:44Z [BCAST]    presence: 9 here → 9 sockets (r:cd8c)
+2026-10-19T03:29:44Z [JOIN]     Person D connected to /live (10 open)
+2026-10-19T03:29:44Z [SNAPSHOT] → Person D welcome + presence: 9 here
+2026-10-19T03:29:44Z [RECV]     Person D socket hello (r:a5bd)
+2026-10-19T03:29:44Z [JOIN]     Person D joined the room (10 here) (r:a5bd)
+2026-10-19T03:29:44Z [BCAST]    presence: 10 here → 10 sockets (r:a5bd)
+2026-10-19T03:29:47Z [RECV]     Person K POST /videos/35aed795/comments (r:afb3)
+2026-10-19T03:29:47Z [DONE]     Person K commented on video 35aed795 (Person M's): "[text]" (r:afb3)
+2026-10-19T03:29:47Z [BCAST]    comment 35aed795 → 10 sockets (r:afb3)
+2026-10-19T03:29:58Z [RECV]     Person M POST /videos/06080f86/comments (r:e5f2)
+2026-10-19T03:29:58Z [DONE]     Person M commented on video 06080f86 (Person N's): "[text]" (r:e5f2)
+2026-10-19T03:29:58Z [BCAST]    comment 06080f86 → 10 sockets (r:e5f2)
+2026-10-19T03:30:48Z [LEAVE]    Person M left the room (9 here) (r:ac8a)
+2026-10-19T03:30:48Z [BCAST]    presence: 9 here → 9 sockets (r:ac8a)
+2026-10-19T03:30:50Z [JOIN]     Person M connected to /live (10 open)
+2026-10-19T03:30:50Z [SNAPSHOT] → Person M welcome + presence: 9 here
+2026-10-19T03:30:50Z [RECV]     Person M socket hello (r:3a68)
+2026-10-19T03:30:50Z [JOIN]     Person M joined the room (10 here) (r:3a68)
+2026-10-19T03:30:50Z [BCAST]    presence: 10 here → 10 sockets (r:3a68)
+2026-10-19T03:30:50Z [LEAVE]    Person M left the room (9 here) (r:4c05)
+2026-10-19T03:30:50Z [BCAST]    presence: 9 here → 9 sockets (r:4c05)
+2026-10-19T03:30:50Z [JOIN]     Person M connected to /live (10 open)
+2026-10-19T03:30:50Z [SNAPSHOT] → Person M welcome + presence: 9 here
+2026-10-19T03:30:50Z [RECV]     Person M socket hello (r:1f2e)
+2026-10-19T03:30:50Z [JOIN]     Person M joined the room (10 here) (r:1f2e)
+2026-10-19T03:30:50Z [BCAST]    presence: 10 here → 10 sockets (r:1f2e)
+2026-10-19T03:30:51Z [LEAVE]    Person M left the room (9 here) (r:21a2)
+2026-10-19T03:30:51Z [BCAST]    presence: 9 here → 9 sockets (r:21a2)
+2026-10-19T03:30:51Z [LEAVE]    Person M left the room (8 here) (r:064f)
+2026-10-19T03:30:51Z [BCAST]    presence: 8 here → 8 sockets (r:064f)
+2026-10-19T03:30:53Z [JOIN]     Person M connected to /live (9 open)
+2026-10-19T03:30:53Z [SNAPSHOT] → Person M welcome + presence: 8 here
+2026-10-19T03:30:53Z [RECV]     Person M socket hello (r:5b7a)
+2026-10-19T03:30:53Z [JOIN]     Person M joined the room (9 here) (r:5b7a)
+2026-10-19T03:30:53Z [BCAST]    presence: 9 here → 9 sockets (r:5b7a)
+2026-10-19T03:33:22Z [JOIN]     Person L connected to /live (10 open)
+2026-10-19T03:33:22Z [SNAPSHOT] → Person L welcome + presence: 9 here
+2026-10-19T03:33:22Z [RECV]     Person L socket hello (r:ec2e)
+2026-10-19T03:33:22Z [JOIN]     Person L joined the room (10 here) (r:ec2e)
+2026-10-19T03:33:22Z [BCAST]    presence: 10 here → 9 sockets (r:ec2e)
+2026-10-19T03:33:23Z [JOIN]     Person L connected to /live (11 open)
+2026-10-19T03:33:23Z [SNAPSHOT] → Person L welcome + presence: 10 here
+2026-10-19T03:33:23Z [RECV]     Person L socket hello (r:5088)
+2026-10-19T03:33:23Z [JOIN]     Person L joined the room (11 here) (r:5088)
+2026-10-19T03:33:23Z [BCAST]    presence: 11 here → 9 sockets (r:5088)
+2026-10-19T03:33:26Z [LEAVE]    Person L left the room (10 here) (r:7fee)
+2026-10-19T03:33:26Z [BCAST]    presence: 10 here → 8 sockets (r:7fee)
+2026-10-19T03:33:27Z [LEAVE]    Person L left the room (9 here) (r:b782)
+2026-10-19T03:33:27Z [BCAST]    presence: 9 here → 8 sockets (r:b782)
+2026-10-19T03:33:29Z [LEAVE]    Person L left the room (8 here) (r:0110)
+2026-10-19T03:33:29Z [BCAST]    presence: 8 here → 8 sockets (r:0110)
+2026-10-19T03:33:37Z [LEAVE]    Person D left the room (7 here) (r:f220)
+2026-10-19T03:33:37Z [BCAST]    presence: 7 here → 7 sockets (r:f220)
+2026-10-19T03:33:39Z [LEAVE]    Person N left the room (6 here) (r:c0d7)
+2026-10-19T03:33:39Z [BCAST]    presence: 6 here → 6 sockets (r:c0d7)
+2026-10-19T03:33:40Z [JOIN]     Person N connected to /live (7 open)
+2026-10-19T03:33:40Z [SNAPSHOT] → Person N welcome + presence: 6 here
+2026-10-19T03:33:40Z [RECV]     Person N socket hello (r:67ac)
+2026-10-19T03:33:40Z [JOIN]     Person N joined the room (7 here) (r:67ac)
+2026-10-19T03:33:40Z [BCAST]    presence: 7 here → 7 sockets (r:67ac)
+2026-10-19T03:33:40Z [LEAVE]    Person N left the room (6 here) (r:9f76)
+2026-10-19T03:33:40Z [BCAST]    presence: 6 here → 6 sockets (r:9f76)
+2026-10-19T03:35:25Z [LEAVE]    Person K left the room (5 here) (r:2c63)
+2026-10-19T03:35:25Z [BCAST]    presence: 5 here → 4 sockets (r:2c63)
+2026-10-19T03:35:25Z [LEAVE]    Person K left the room (4 here) (r:0c92)
+2026-10-19T03:35:25Z [BCAST]    presence: 4 here → 3 sockets (r:0c92)
+2026-10-19T03:35:25Z [LEAVE]    Person K left the room (3 here) (r:0ee2)
+2026-10-19T03:35:25Z [BCAST]    presence: 3 here → 3 sockets (r:0ee2)
+2026-10-19T03:36:57Z [LEAVE]    Person M left the room (2 here) (r:75fd)
+2026-10-19T03:36:57Z [BCAST]    presence: 2 here → 2 sockets (r:75fd)
+2026-10-19T03:37:14Z [SNAPSHOT] → Person Q feed page: 3 videos
+2026-10-19T03:37:15Z [JOIN]     Person Q connected to /live (3 open)
+2026-10-19T03:37:15Z [SNAPSHOT] → Person Q welcome + presence: 2 here
+2026-10-19T03:37:15Z [RECV]     Person Q socket hello (r:c92c)
+2026-10-19T03:37:15Z [JOIN]     Person Q joined the room (3 here) (r:c92c)
+2026-10-19T03:37:15Z [BCAST]    presence: 3 here → 3 sockets (r:c92c)
+2026-10-19T03:56:36Z [LEAVE]    Person Q left the room (2 here) (r:ae51)
+2026-10-19T03:56:36Z [BCAST]    presence: 2 here → 2 sockets (r:ae51)
+2026-10-19T03:58:28Z [SNAPSHOT] → Person R feed page: 3 videos
+2026-10-19T03:58:50Z [SNAPSHOT] → Person S feed page: 3 videos

@@ -115,3 +115,17 @@ It shows the logs as they happen and appends them to that day's file.
 Ctrl+C stops it. The recordings stay on your machine, because
 `docs/testing/logs/` is git-ignored: they hold the names real visitors chose,
 and this repo is public. Copy into a report only the lines it needs, as above.
+
+## The whole crit session, anonymised
+
+`crit-10-session-2026-10-19.txt` is every event the server logged on
+2026-10-19 while the recorder ran, including the crit itself: 349 lines from
+19 browsers. It's anonymised by `scripts/anonymise-log.mjs`:
+
+- each handle becomes **Person A, B, C…** in order of first appearance, and
+  the name and emoji people chose are dropped
+- anything people typed (comments, captions, names) becomes `"[text]"`
+
+Events, times, request ids, counts, sizes and whose-thing-it-was are kept, so
+it still shows who did what to whom, just not who they are. The raw recording
+stays local and git-ignored. My own test above is Persons E (Kai) and F (Mia).
