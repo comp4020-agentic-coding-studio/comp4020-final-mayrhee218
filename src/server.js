@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { identify } from "./identity.js";
 import { attachLive, broadcast } from "./live.js";
-import { act, quote, remember, shortId, who } from "./log.js";
+import { act, newRequestId, quote, received, rejected, remember, shortId, snapshot, who, withRequest } from "./log.js";
 import { renderReadme } from "./readme.js";
 import { MAX_ROOM_BYTES, RoomError, getRoom, listRooms, providerInfo, removeRoom, roomFile, startRoom } from "./rooms.js";
 import {
@@ -44,6 +44,26 @@ app.use("/media", express.static(VIDEOS_DIR, { immutable: true, maxAge: "30d" })
 // browser, set from its cookie (src/identity.js), never from the request body.
 app.use(identify);
 
+// Every action, logged on the way in and, if refused, on the way out. Reads
+// (GET) aren't actions and aren't logged, except the feed snapshot below.
+// Every change runs inside its request id, so its DONE and BCAST lines carry
+// it too. Refusals are caught here, by status, rather than at each of the many
+// places that refuse: any 4xx or 5xx is a REJECT with the reason it sent.
+app.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return next();
+  const rid = newRequestId();
+  const what = `${req.method} ${req.path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, (id) => id.slice(0, 8))}`;
+  withRequest(rid, () => {
+    received(req.by, what);
+    const json = res.json.bind(res);
+    res.json = (body) => {
+      if (res.statusCode >= 400) withRequest(rid, () => rejected(req.by, `${what}: ${res.statusCode} ${body?.error ?? ""}`.trim()));
+      return json(body);
+    };
+    next();
+  });
+});
+
 // The name and avatar a request offers. Labels only: who you are is req.by.
 // Remembered against your handle so later log lines can name you.
 const person = (req, body) => {
@@ -56,8 +76,10 @@ const person = (req, body) => {
 };
 const whose = (videoId) => `(${who(ownerOf(videoId))}'s)`;
 
-app.get("/", async (_req, res) => {
-  res.type("html").send(renderFeed(await listVideos()));
+app.get("/", async (req, res) => {
+  const videos = await listVideos();
+  snapshot(req.by, `feed page: ${videos.length} video${videos.length === 1 ? "" : "s"}`);
+  res.type("html").send(renderFeed(videos));
 });
 
 app.get("/create", (_req, res) => {
@@ -91,7 +113,6 @@ app.post("/videos", async (req, res) => {
     res.status(201).json(video);
   } catch (err) {
     if (!(err instanceof UploadError)) throw err;
-    act(req.by, `FAILED upload: ${err.message}`);
     res.status(err.status).json({ error: err.message });
   }
 });
@@ -129,13 +150,12 @@ app.post("/rooms", express.raw({ type: () => true, limit: MAX_ROOM_BYTES }), asy
   try {
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     const job = await startRoom(req.by, body, req.query, (j) => {
-      const what = { queued: "asked for", working: "is waiting on", done: "got", failed: "FAILED" }[j.status];
+      const what = { queued: "queued", working: "is waiting on", done: "got", failed: "did not get (failed)" }[j.status];
       act(req.by, `${what} an AI room restyle ${shortId(j.id)} [${j.style}${j.error ? `: ${j.error}` : ""}]`);
     });
     res.status(202).json(job);
   } catch (err) {
     if (!(err instanceof RoomError)) throw err;
-    act(req.by, `REFUSED AI room restyle: ${err.message}`);
     res.status(err.status).json({ error: err.message });
   }
 });
@@ -161,27 +181,26 @@ app.delete("/rooms/:id", async (req, res) => {
   res.status(204).end();
 });
 
-const refuse = (res, result, what) =>
+// `owner`, if known, is said in the refusal so the REJECT log line names whose
+// thing it was. It's a public handle, which the feed already shows.
+const refuse = (res, result, what, owner = "") =>
   result === "missing"
     ? res.status(404).json({ error: `no such ${what}` })
-    : res.status(403).json({ error: `that ${what} isn't yours to delete` });
+    : res.status(403).json({ error: `that ${what} isn't yours to delete${owner ? ` ${owner}` : ""}` });
 
 app.delete("/videos/:id", async (req, res) => {
   const owner = whose(req.params.id);
   const result = await removeVideo(req.params.id, req.by);
-  if (result === "forbidden") act(req.by, `REFUSED delete video ${shortId(req.params.id)} ${owner}`);
-  if (typeof result === "string") return refuse(res, result, "video");
+  if (typeof result === "string") return refuse(res, result, "video", owner);
   act(req.by, `deleted video ${shortId(req.params.id)} ${quote(result.caption)}`);
   broadcast({ type: "video-removed", id: req.params.id, by: req.by });
   res.status(204).end();
 });
 
 app.delete("/videos/:id/comments/:commentId", async (req, res) => {
+  const owner = whose(req.params.id);
   const result = await removeComment(req.params.id, req.params.commentId, req.by);
-  if (result === "forbidden") {
-    act(req.by, `REFUSED delete comment ${shortId(req.params.commentId)} on video ${shortId(req.params.id)} ${whose(req.params.id)}`);
-  }
-  if (typeof result === "string") return refuse(res, result, "comment");
+  if (typeof result === "string") return refuse(res, result, "comment", `(on ${owner.slice(1, -1)} video)`);
   const theirs = result.by === req.by ? "their own" : `${who(result.by)}'s`;
   act(req.by, `deleted ${theirs} comment on video ${shortId(req.params.id)}: ${quote(result.text)}`);
   broadcast({ type: "comment-removed", id: req.params.id, commentId: req.params.commentId });
@@ -208,7 +227,6 @@ function ownedRoutes(collection, { list, files, noun, describe }) {
       res.status(201).json(item);
     } catch (err) {
       if (!(err instanceof UploadError)) throw err;
-      act(req.by, `FAILED ${noun} upload: ${err.message}`);
       res.status(err.status).json({ error: err.message });
     }
   });
@@ -224,7 +242,6 @@ function ownedRoutes(collection, { list, files, noun, describe }) {
 
   app.delete(`${list}/:id`, async (req, res) => {
     const result = await collection.remove(req.params.id, req.by);
-    if (result === "forbidden") act(req.by, `REFUSED delete ${noun} ${shortId(req.params.id)}`);
     if (typeof result === "string") return refuse(res, result, noun);
     act(req.by, `deleted ${noun} ${shortId(req.params.id)} ${quote(result.name)}`);
     res.status(204).end();
