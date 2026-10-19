@@ -25,3 +25,7 @@ mise.local.toml
 # local spec server writes (DATA_DIR=./.spec-data)
 .data/
 .spec-data/
+
+# raw live-log recordings (scripts/record-logs.sh): they hold the names real
+# visitors chose, and this repo is public. Quote what a report needs instead.
+docs/testing/logs/
