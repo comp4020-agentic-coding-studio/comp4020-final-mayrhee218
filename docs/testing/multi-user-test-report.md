@@ -41,9 +41,8 @@ was deleted by its owner.
 
 ## Log of the session
 
-Every line the server wrote during the test, unedited. Another visitor was
-another person already in the app (the "1 here" when Kai arrived), so their
-presence shows in the counts.
+Every line the server wrote during the test, unedited. Another visitor,
+already in the app (the "1 here" when Kai arrived), shows in the counts.
 
 ```
 2026-10-19T03:17:34Z [SNAPSHOT] → #5hv95jJFi3 feed page: 1 video
