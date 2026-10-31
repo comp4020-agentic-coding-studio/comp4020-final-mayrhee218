@@ -26,13 +26,34 @@ export const handleFromCookie = (cookieHeader) => {
   return token ? handleOf(token) : null;
 };
 
-export function identify(req, res, next) {
-  let token = tokenFrom(req.get("cookie"));
-  if (!token) {
-    token = randomBytes(16).toString("base64url");
-    const secure = req.secure || req.get("x-forwarded-proto") === "https" ? "; Secure" : "";
-    res.append("set-cookie", `${COOKIE}=${token}; Path=/; Max-Age=${YEAR_SECONDS}; HttpOnly; SameSite=Lax${secure}`);
-  }
+// Owners can delete anything (docs/decisions/0005-devices-and-owners.md). Set
+// as a comma-separated list of handles, e.g. `fly secrets set OWNER_HANDLES=…`;
+// a handle is public, but only the browser holding its token can act as it.
+const OWNERS = new Set(
+  String(process.env.OWNER_HANDLES ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+);
+export const isOwner = (by) => Boolean(by) && OWNERS.has(by);
+
+// Gives this browser `token` as its identity, from now on.
+export function setIdentity(req, res, token) {
+  const secure = req.secure || req.get("x-forwarded-proto") === "https" ? "; Secure" : "";
+  res.append("set-cookie", `${COOKIE}=${token}; Path=/; Max-Age=${YEAR_SECONDS}; HttpOnly; SameSite=Lax${secure}`);
+  req.token = token;
   req.by = handleOf(token);
+}
+
+// req.token is the secret; it never leaves the server except in this browser's
+// own cookie, and is never logged. req.by is the public handle.
+export function identify(req, res, next) {
+  const token = tokenFrom(req.get("cookie"));
+  if (token) {
+    req.token = token;
+    req.by = handleOf(token);
+  } else {
+    setIdentity(req, res, randomBytes(16).toString("base64url"));
+  }
   next();
 }

@@ -23,9 +23,11 @@ const rememberLikes = () => {
 let muted = true;
 let myId = null;
 let myBy = null; // this browser's public handle, from the server
+let iOwn = false; // an app owner, who may delete anything; the server decides
 let openClip = null;
 const comments = new Map(); // video id -> comment[]
 
+const mayDelete = (clip) => iOwn || (Boolean(myBy) && clip.dataset.by === myBy);
 const clipFor = (id) => document.querySelector(`.clip[data-id="${CSS.escape(id)}"]`);
 
 function showToast(text) {
@@ -93,7 +95,7 @@ function wire(clip) {
   clip.querySelector(".comments-open").addEventListener("click", () => openComments(clip));
   clip.querySelector(".share").addEventListener("click", () => share(clip));
   const deleteButton = clip.querySelector(".delete");
-  deleteButton.hidden = !myBy || clip.dataset.by !== myBy;
+  deleteButton.hidden = !mayDelete(clip);
   deleteButton.addEventListener("click", () => deleteVideo(clip));
   visibility.observe(clip);
 }
@@ -145,8 +147,8 @@ function commentItem(c, arrived = false) {
   const body = el("div");
   body.append(el("div", "name", c.name || "someone"), el("p", "", c.text));
   li.append(el("span", "who", c.avatar), body);
-  // Mirrors the server's rule: the writer, or the video's poster.
-  if (myBy && (c.by === myBy || openClip?.dataset.by === myBy)) {
+  // Mirrors the server's rule: the writer, the video's poster, or an owner.
+  if (iOwn || (myBy && (c.by === myBy || openClip?.dataset.by === myBy))) {
     const remove = el("button", "remove", "✕");
     remove.type = "button";
     remove.setAttribute("aria-label", "delete this comment");
@@ -252,8 +254,9 @@ connectLive(
     if (msg.type === "welcome") {
       myId = msg.id;
       myBy = msg.by;
+      iOwn = Boolean(msg.owner);
       for (const button of feed.querySelectorAll(".clip .delete")) {
-        button.hidden = button.closest(".clip").dataset.by !== myBy;
+        button.hidden = !mayDelete(button.closest(".clip"));
       }
     }
     if (msg.type === "video-removed") {
@@ -263,7 +266,7 @@ connectLive(
         clip.remove();
         comments.delete(msg.id);
         if (openClip === clip) sheet.close();
-        if (!msg.by || msg.by !== myBy) showToast("a video was removed by its poster");
+        if (!msg.by || msg.by !== myBy) showToast(msg.byOwner ? "a video was removed by the app's owner" : "a video was removed by its poster");
       }
     }
     if (msg.type === "comment-removed") {

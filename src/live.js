@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
-import { handleFromCookie } from "./identity.js";
+import { handleFromCookie, isOwner } from "./identity.js";
 import { broadcasted, joined, left, newRequestId, received, rejected, remember, snapshot, withRequest } from "./log.js";
 import { AVATARS } from "./views.js";
 
@@ -44,7 +44,7 @@ export function attachLive(server) {
     // here and can offer delete on what it owns. The server still decides.
     const by = handleFromCookie(req.headers.cookie);
     joined(by, `connected to /live (${wss.clients.size} open)`);
-    ws.send(JSON.stringify({ type: "welcome", id, by }));
+    ws.send(JSON.stringify({ type: "welcome", id, by, owner: isOwner(by) }));
     // Late arrivals see who's already here before they introduce themselves.
     ws.send(JSON.stringify({ type: "presence", people: [...people.values()] }));
     snapshot(by, `welcome + presence: ${people.size} here`);

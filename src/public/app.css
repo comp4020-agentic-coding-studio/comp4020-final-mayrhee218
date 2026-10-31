@@ -238,3 +238,10 @@ body.doc .bottom-nav a.active { color: var(--accent-ink); }
 .room .tag { font-size: 0.65rem; padding: 0.05rem 0.4rem; border-radius: 0.5rem; background: var(--accent-2); color: var(--on-accent); }
 .room .consent { background: var(--tint); border: 1px solid var(--accent); border-radius: 0.7rem; padding: 0.6rem; margin: 0.4rem 0; color: var(--fg); }
 .room .consent p { margin: 0 0 0.4rem; }
+
+/* Devices: link another browser */
+.link section { margin: 1.5rem 0; }
+.link .code { font: 700 2rem/1.2 ui-monospace, monospace; letter-spacing: 0.15em; margin: 0.8rem 0 0.2rem; }
+.link form { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.link input { flex: 1 1 10rem; font: 600 1.1rem ui-monospace, monospace; text-transform: uppercase; padding: 0.5rem 0.7rem; border-radius: 0.6rem; border: 1px solid var(--sheet-line); }
+.link .hint { color: var(--sheet-muted); }

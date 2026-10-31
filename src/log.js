@@ -22,6 +22,7 @@ import { randomBytes } from "node:crypto";
 //   REJECT    the action was refused, and why
 //   BCAST     an update sent to every open socket, and how many got it
 //   SNAPSHOT  the current state sent to one person: the feed, or presence
+//   OWNER     an app owner removed someone else's video or comment
 //
 // (r:xxxx) ties together the lines one request caused: its RECV, then its
 // DONE or REJECT, then any BCAST it set off.
@@ -68,4 +69,5 @@ export const received = (by, what) => line("RECV", `${who(by)} ${what}`);
 export const act = (by, what) => line("DONE", `${who(by)} ${what}`);
 export const rejected = (by, what) => line("REJECT", `${who(by)} ${what}`);
 export const broadcasted = (what, sockets) => line("BCAST", `${what} → ${sockets} socket${sockets === 1 ? "" : "s"}`);
+export const moderated = (by, what) => line("OWNER", `${who(by)} ${what}`);
 export const snapshot = (by, what) => line("SNAPSHOT", `→ ${who(by)} ${what}`);

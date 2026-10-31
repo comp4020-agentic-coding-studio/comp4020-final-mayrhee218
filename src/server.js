@@ -1,9 +1,10 @@
 import express from "express";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { identify } from "./identity.js";
+import { identify, isOwner, setIdentity } from "./identity.js";
+import { claimCode, issueCode } from "./link.js";
 import { attachLive, broadcast } from "./live.js";
-import { act, newRequestId, quote, received, rejected, remember, shortId, snapshot, who, withRequest } from "./log.js";
+import { act, moderated, newRequestId, quote, received, rejected, remember, shortId, snapshot, who, withRequest } from "./log.js";
 import { renderReadme } from "./readme.js";
 import { MAX_ROOM_BYTES, RoomError, getRoom, listRooms, providerInfo, removeRoom, roomFile, startRoom } from "./rooms.js";
 import {
@@ -21,7 +22,7 @@ import {
 } from "./store.js";
 import { avatars, worlds } from "./models.js";
 import { MAX_BYTES, UploadError, receiveVideo } from "./upload.js";
-import { AVATARS, renderCreate, renderFeed, renderReadmePage } from "./views.js";
+import { AVATARS, renderCreate, renderFeed, renderLink, renderReadmePage } from "./views.js";
 
 // The volume is 1 GB; leave headroom for metadata and a clip mid-upload.
 const STORAGE_BUDGET = 850 * 1024 * 1024;
@@ -188,21 +189,28 @@ const refuse = (res, result, what, owner = "") =>
     ? res.status(404).json({ error: `no such ${what}` })
     : res.status(403).json({ error: `that ${what} isn't yours to delete${owner ? ` ${owner}` : ""}` });
 
+// An owner deleting what isn't theirs is logged as OWNER, not DONE, so every
+// use of the role can be found with `flyctl logs | grep OWNER`.
 app.delete("/videos/:id", async (req, res) => {
   const owner = whose(req.params.id);
-  const result = await removeVideo(req.params.id, req.by);
+  const result = await removeVideo(req.params.id, req.by, { asOwner: isOwner(req.by) });
   if (typeof result === "string") return refuse(res, result, "video", owner);
-  act(req.by, `deleted video ${shortId(req.params.id)} ${quote(result.caption)}`);
-  broadcast({ type: "video-removed", id: req.params.id, by: req.by });
+  if (result.by === req.by) act(req.by, `deleted video ${shortId(req.params.id)} ${quote(result.caption)}`);
+  else moderated(req.by, `removed video ${shortId(req.params.id)} ${owner} ${quote(result.caption)}`);
+  broadcast({ type: "video-removed", id: req.params.id, by: req.by, ...(result.by !== req.by && { byOwner: true }) });
   res.status(204).end();
 });
 
 app.delete("/videos/:id/comments/:commentId", async (req, res) => {
   const owner = whose(req.params.id);
-  const result = await removeComment(req.params.id, req.params.commentId, req.by);
+  const asOwner = isOwner(req.by);
+  const result = await removeComment(req.params.id, req.params.commentId, req.by, { asOwner });
   if (typeof result === "string") return refuse(res, result, "comment", `(on ${owner.slice(1, -1)} video)`);
   const theirs = result.by === req.by ? "their own" : `${who(result.by)}'s`;
-  act(req.by, `deleted ${theirs} comment on video ${shortId(req.params.id)}: ${quote(result.text)}`);
+  const what = `comment on video ${shortId(req.params.id)}: ${quote(result.text)}`;
+  // A poster clearing their own video's comments is their right, not the role.
+  if (asOwner && result.by !== req.by && ownerOf(req.params.id) !== req.by) moderated(req.by, `removed ${theirs} ${what}`);
+  else act(req.by, `deleted ${theirs} ${what}`);
   broadcast({ type: "comment-removed", id: req.params.id, commentId: req.params.commentId });
   res.status(204).end();
 });
@@ -256,6 +264,30 @@ ownedRoutes(avatars, {
   describe: (m) => `${m.kind}, ${kb(m)}, face tracking ${m.faceTracking ? "yes" : "no"}`,
 });
 ownedRoutes(worlds, { list: "/worlds", files: "/world-files", noun: "world", describe: kb });
+
+// Linking another device (src/link.js). The code is the secret while it lives,
+// so it's sent only to the browser that asked and never logged.
+app.get("/link", (_req, res) => {
+  res.type("html").send(renderLink());
+});
+
+app.post("/link", (req, res) => {
+  const issued = issueCode(req.token, req.by);
+  act(req.by, "asked for a code to link another device");
+  res.status(201).json(issued);
+});
+
+// JSON only, so a form on another site can't post here and swap a visitor's
+// identity for the attacker's.
+app.post("/link/claim", express.json(), (req, res) => {
+  if (!req.is("application/json")) return res.status(415).json({ error: "send the code as JSON" });
+  const entry = claimCode(req.body?.code);
+  if (!entry) return res.status(404).json({ error: "that code isn't right, or it has expired — ask for a new one" });
+  const was = req.by;
+  if (entry.by !== was) setIdentity(req, res, entry.token);
+  act(req.by, entry.by === was ? "used their own link code on the same device" : `linked another device (it was ${who(was)})`);
+  res.json({ by: req.by });
+});
 
 app.get("/readme/", async (_req, res) => {
   res.type("html").send(renderReadmePage(await renderReadme()));

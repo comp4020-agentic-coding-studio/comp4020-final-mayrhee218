@@ -193,10 +193,42 @@ export function renderReadmePage(html) {
   return layout(
     "About",
     `<main class="readme">
-      <nav><a href="/">&larr; back to the feed</a></nav>
+      <nav><a href="/">&larr; back to the feed</a> · <a href="/link">Use on another device</a></nav>
       ${html}
     </main>
     ${bottomNav("about")}`,
     { bodyClass: "doc" },
+  );
+}
+
+// Link another device (src/link.js): one browser shows a code, the other types it.
+export function renderLink() {
+  return layout(
+    "Devices",
+    `<main class="readme link">
+      <nav><a href="/">&larr; back to the feed</a></nav>
+      <h1>Use this app on another device</h1>
+      <p>There are no accounts: you are this browser. To be the same person on your phone and your laptop, link them. Then either can delete what you've posted from both.</p>
+
+      <section aria-labelledby="give">
+        <h2 id="give">On the device you already use</h2>
+        <button type="button" class="pill" id="link-issue">Show a link code</button>
+        <p class="code" id="link-code" aria-live="polite" hidden></p>
+        <p class="hint" id="link-expiry"></p>
+      </section>
+
+      <section aria-labelledby="take">
+        <h2 id="take">On the new device</h2>
+        <p>Type the code here. <strong>This browser then becomes that person:</strong> anything it posted before stays up, but can no longer be deleted from here.</p>
+        <form id="link-claim">
+          <input name="code" placeholder="ABCD-2345" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" required aria-label="link code" />
+          <button type="submit" class="pill">Link</button>
+        </form>
+        <p class="hint" id="link-status" role="status"></p>
+      </section>
+      <p class="hint">Only show a code to yourself: whoever types it in becomes you.</p>
+    </main>
+    ${bottomNav()}`,
+    { bodyClass: "doc", scripts: ["link.js"] },
   );
 }

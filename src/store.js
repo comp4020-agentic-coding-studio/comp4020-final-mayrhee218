@@ -94,19 +94,21 @@ export async function addComment(id, comment) {
 // The rules for who may remove what live here, beside the data, so every
 // route goes through the same check. See docs/decisions/0002-who-may-change-what.md.
 // Each returns "missing", "forbidden" or the removed record.
-export async function removeVideo(id, by) {
+// `asOwner` is an app owner (isOwner in src/identity.js): they may remove
+// anything, ownerless posts from before crit 10 included.
+export async function removeVideo(id, by, { asOwner = false } = {}) {
   await ensureLoaded();
   const index = videos.findIndex((v) => v.id === id);
   if (index === -1) return "missing";
   const video = videos[index];
-  if (!video.by || video.by !== by) return "forbidden";
+  if (!asOwner && (!video.by || video.by !== by)) return "forbidden";
   videos.splice(index, 1);
   await save();
   await rm(path.join(VIDEOS_DIR, video.file), { force: true });
   return video;
 }
 
-export async function removeComment(videoId, commentId, by) {
+export async function removeComment(videoId, commentId, by, { asOwner = false } = {}) {
   await ensureLoaded();
   const video = videos.find((v) => v.id === videoId);
   const index = video?.comments.findIndex((c) => c.id === commentId) ?? -1;
@@ -114,7 +116,7 @@ export async function removeComment(videoId, commentId, by) {
   const comment = video.comments[index];
   const wroteIt = comment.by && comment.by === by;
   const ownsVideo = video.by && video.by === by;
-  if (!wroteIt && !ownsVideo) return "forbidden";
+  if (!wroteIt && !ownsVideo && !asOwner) return "forbidden";
   video.comments.splice(index, 1);
   await save();
   return comment;
