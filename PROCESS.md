@@ -245,17 +245,17 @@ decision 0002 asked for. It needs no new dependency and no outside service,
 and it's tested end to end. It doesn't solve recovery: if you lose every
 linked browser, you're gone.
 
-### An owner role
+Linking is recorded in `docs/decisions/0005-linking-devices.md`, and its
+contract is in `spec/devices-and-owners.test.ts`.
 
-Owners are listed by handle in an `OWNER_HANDLES` secret, so `fly.toml`
-doesn't change. An owner can delete any video or comment, and every use is
-logged as its own kind, `[OWNER]`, naming whose thing it was. Deleting your
-own things is still an ordinary `[DONE]` line. This also fixes the oldest
-limit: posts from before crit 10, which have no owner, can finally be removed.
+### An owner role, built but left off
 
-Both are recorded in `docs/decisions/0005-devices-and-owners.md`, and the
-contract is `spec/devices-and-owners.test.ts`. The owner tests need an app
-started with a known owner, so CI skips them. I ran them locally against an app
+The agent also built an owner role: handles listed in `OWNER_HANDLES` can
+delete any video or comment, and each use is logged as an `[OWNER]` line. I
+decided to leave it out of decision 0005 and keep it switched off. Nothing
+sets `OWNER_HANDLES` on the deploy, so on the live app nobody is an owner and
+the rules are still the ones in decision 0002. Its tests need an app started
+with a known owner, so CI skips them; they passed locally against an app
 started with a test owner.
 
 I also checked the pages in a real browser, with three separate browser
@@ -263,8 +263,9 @@ contexts:
 
 - Before linking, the phone had no delete button on the laptop's clip; after
   linking, it did.
-- The owner saw delete on every clip, and when they removed one, the laptop's
-  feed said it was removed "by the app's owner".
+- With the role switched on locally, the owner saw delete on every clip, and
+  when they removed one, the laptop's feed said it was removed "by the app's
+  owner".
 
 That check also caught a layout problem the tests couldn't: a fourth button in
 the bottom nav pushed **＋** off centre. The link page moved to the About page
@@ -277,8 +278,9 @@ instead.
   an identity whose browsers are all gone.
 - **Linking can't be undone.** A linked browser stays you until its cookie is
   cleared.
-- **Moderation is one list.** Owners are set by an environment variable, so
-  changing them needs a redeploy.
+- **No moderation.** You can delete your own things, but nobody can remove
+  someone else's video, and posts from before crit 10 can't be deleted at
+  all. The owner role that would fix this exists but is switched off.
 - **Face-only tracking.** The avatar is a 3D VRM, but only the face drives
   it: body tracking is planned, not built. Webcam tracking is not professional
   motion capture.

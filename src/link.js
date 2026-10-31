@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 
-// Linking a second device (docs/decisions/0005-devices-and-owners.md). A
+// Linking a second device (docs/decisions/0005-linking-devices.md). A
 // browser asks for a short code; typing it into another browser within ten
 // minutes makes that browser the same person, with the same token and handle.
 // Codes live only in memory: a restart forgets them, which costs a retry.

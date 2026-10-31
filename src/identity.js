@@ -26,9 +26,10 @@ export const handleFromCookie = (cookieHeader) => {
   return token ? handleOf(token) : null;
 };
 
-// Owners can delete anything (docs/decisions/0005-devices-and-owners.md). Set
-// as a comma-separated list of handles, e.g. `fly secrets set OWNER_HANDLES=…`;
-// a handle is public, but only the browser holding its token can act as it.
+// Owners can delete anything. Off unless OWNER_HANDLES is set, and it isn't on
+// the deploy: this isn't part of any accepted decision yet. To switch it on,
+// list handles comma-separated, e.g. `fly secrets set OWNER_HANDLES=…`; a
+// handle is public, but only the browser holding its token can act as it.
 const OWNERS = new Set(
   String(process.env.OWNER_HANDLES ?? "")
     .split(",")

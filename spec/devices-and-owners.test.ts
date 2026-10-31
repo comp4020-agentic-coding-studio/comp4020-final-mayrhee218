@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, inject, it } from "vitest";
 
-// One person on two devices, and an owner who can remove anything. The rules
-// are written down in docs/decisions/0005-devices-and-owners.md. As in
+// One person on two devices (docs/decisions/0005-linking-devices.md), and an
+// owner who can remove anything, which is off unless OWNER_HANDLES is set. As in
 // permissions.test.ts, each `person()` is a separate browser with its own
 // cookie jar.
 const baseUrl = inject("baseUrl");
