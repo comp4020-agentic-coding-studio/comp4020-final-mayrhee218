@@ -208,19 +208,82 @@ stays after the crit: it's what I'll read when the deployed app misbehaves.
   It's the crit 9 lesson again: green tests are not a working page. The fix is
   [`6412c49`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6412c49).
 
+## After Crit 10: Working Through "Next"
+
+At the end of crit 10, my "Next" list had three items: a sign-in, an owner
+role, and a 3D avatar.
+
+### A 3D avatar was already done
+
+The 3D avatar landed before I came back to this list, so its line was out of
+date. The drawn 2D character became three built-in VRM models in
+[`99a2cfc`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/99a2cfc),
+which drive every expression a model has
+([`2730493`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/2730493)).
+People can upload their own `.vrm`, checked on the server and kept private
+([`f8cab83`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/f8cab83),
+decision 0003), and stand it inside an uploaded 3D world
+([`7b6c914`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/7b6c914),
+decision 0004). Body tracking is still only a plan, in
+`docs/body-tracking-plan.md`.
+
+### Sign-in became a device link code
+
+Decision 0002 said a sign-in by email link or passkey would let a person keep
+their videos across devices. Looking at each:
+
+- **An email link** needs a paid email provider and an API key. My CLAUDE.md
+  says a paid service needs my approval, and my pod would need real email
+  addresses at a crit.
+- **A passkey** adds a library on both sides and can't be tested from `spec/`
+  over plain HTTP.
+
+I chose a **device link code** instead. The browser you already use shows a
+one-time code, valid for ten minutes. Typing it on the other device gives that
+browser the same identity token, so the handle carries over, which is what
+decision 0002 asked for. It needs no new dependency and no outside service,
+and it's tested end to end. It doesn't solve recovery: if you lose every
+linked browser, you're gone.
+
+### An owner role
+
+Owners are listed by handle in an `OWNER_HANDLES` secret, so `fly.toml`
+doesn't change. An owner can delete any video or comment, and every use is
+logged as its own kind, `[OWNER]`, naming whose thing it was. Deleting your
+own things is still an ordinary `[DONE]` line. This also fixes the oldest
+limit: posts from before crit 10, which have no owner, can finally be removed.
+
+Both are recorded in `docs/decisions/0005-devices-and-owners.md`, and the
+contract is `spec/devices-and-owners.test.ts`. The owner tests need an app
+started with a known owner, so CI skips them. I ran them locally against an app
+started with a test owner.
+
+I also checked the pages in a real browser, with three separate browser
+contexts:
+
+- Before linking, the phone had no delete button on the laptop's clip; after
+  linking, it did.
+- The owner saw delete on every clip, and when they removed one, the laptop's
+  feed said it was removed "by the app's owner".
+
+That check also caught a layout problem the tests couldn't: a fourth button in
+the bottom nav pushed **＋** off centre. The link page moved to the About page
+instead.
+
 ## Known Limits
 
-- **A person is a browser, not a human.** Clearing cookies or opening another
-  profile makes you someone new, and you lose the power to delete what you
-  posted before. Your phone and laptop are two people.
-- **Old posts have no owner.** Videos and comments from before crit 10 can't
-  be deleted by anyone.
-- **No moderation.** You can delete your own things, but nobody can remove
-  someone else's video. That needs accounts and an owner role.
-- **The avatar is 2D and face-only.** There's no 3D model, VRM upload or body
-  tracking yet, and webcam tracking is not professional motion capture.
-- **No AI environments or 2D-to-3D conversion.** Those need GPU infrastructure
-  this deploy doesn't have.
+- **A person is a browser, not a human.** Clearing cookies makes you someone
+  new. A link code can make two browsers one person, but nothing can recover
+  an identity whose browsers are all gone.
+- **Linking can't be undone.** A linked browser stays you until its cookie is
+  cleared.
+- **Moderation is one list.** Owners are set by an environment variable, so
+  changing them needs a redeploy.
+- **Face-only tracking.** The avatar is a 3D VRM, but only the face drives
+  it: body tracking is planned, not built. Webcam tracking is not professional
+  motion capture.
+- **No 2D-to-3D conversion.** A room photo stays a flat background, and AI
+  restyling only works if a provider is configured.
 - **No transcoding.** Clips play in the format they were recorded in (WebM, or
   MP4 from Safari).
 - **Face tracking has only been tested with a fake camera so far.** It needs
@@ -228,7 +291,6 @@ stays after the crit: it's what I'll read when the deployed app misbehaves.
 
 ## Next
 
-- Toward A3: a sign-in (email link or passkey) so a person can keep their
-  videos across devices, with the handle carrying over.
-- An owner role that can remove anything, logged like every other action.
-- A 3D avatar.
+- Body tracking for the upper body, following `docs/body-tracking-plan.md`.
+- A passkey as a way to recover an identity, alongside the link code.
+- Testing face tracking and recording on real phones.

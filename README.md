@@ -1,54 +1,49 @@
-# Project Overview
+# Virtual Human Short-Form Video
 
-My app is a short-form video platform where people can share their daily lives through virtual humans, combining **AR, 3D graphics, computer vision (facial and motion capture), 2D-to-3D conversion, and AI**.
+A short-form video platform where anyone can record and share moments from their daily life as a virtual human. All you need is a webcam or phone camera.
 
-## The Idea
+## What “Good” Means for This App
 
-I’d like to explain the idea through my personal experience.
+Good means a **social short-form video platform for virtual creators** that feels as easy as TikTok.
 
-One of my favorite virtual K-pop groups is **PLAVE**, a virtual boy band from South Korea.
+- **Simple.** A beginner can choose an avatar, record and post a video in under a minute, without reading instructions or installing anything.
+- **Genuinely functional.** Every button does what it says. The avatar follows your face only when the model really supports it. A restyled room photo is labelled as a flat 2D picture, not a 3D world, and an on-device colour filter is never called “AI”.
+- **Private by default.** Face tracking runs in your browser, so only the avatar is recorded and camera frames never leave your device. A room photo is sent to an AI service only when you agree to it, photo by photo.
+- **Social and live.** Two or more people share one feed. New videos, likes and comments reach everyone else within about a second without a reload. You can see who is here right now.
+- **Fair and lasting.** The server, not the browser, decides who may change what: only you can delete your own videos and avatars, and each person can like a video only once. Posted videos survive reloads, restarts and redeploys.
 
-<img width="1600" height="1280" alt="image" src="https://github.com/user-attachments/assets/b8abffe6-0d4e-4a99-afdc-ae46070a569a" />
+When these conflict, privacy and user data come first, and visual polish comes last.
 
+## How to Use This App (Instructions)
 
-One of the great things about PLAVE is how actively they communicate with their fans through text messages, voice messages, chats, and live streams. However, there is one limitation compared to real-life K-pop artists: **it is difficult for virtual artists to easily record and share casual selfie videos or moments from their daily lives.**
+### Watch the feed
 
-And this is not only a challenge for PLAVE.
+1. Open the home page (**Home**). Swipe or scroll up and down to move between videos.
+2. Tap **🔇 Tap for sound** to turn audio on.
+3. Use the buttons on the right of a video:
+   - **♥** to like it
+   - **💬** to read or add comments
+   - **↗ Share** to share its link
+   - **🗑 Delete** to remove it, which only appears on your own videos
+4. The top bar shows the avatars of people watching right now and how many are here. Hover over or long-press a face to see the name.
 
-The virtual human industry is growing rapidly, and millions of people around the world are already interested in VR and virtual experiences. However, creating and using a virtual human often requires specialized devices, 3D models, software, and technical knowledge. This makes the technology difficult for ordinary users to access.
+### Create a video
 
-My goal is to make this experience as simple and accessible as TikTok.
+1. Tap **＋** at the bottom of the screen to open the studio, and choose a mode:
+   - **Avatar:** record as a virtual human
+   - **Camera:** record as yourself
+   - **Upload:** post an existing video of up to 25 MB
+2. In **Avatar** mode, allow camera access. Your head movements, blinks and mouth movements drive the avatar. The camera image itself is never recorded.
+3. Choose an **Avatar**: Cool Banana, Hotdog or Mushy, or **Upload 3D avatar** to use your own `.vrm` file (up to 15 MB). A plain `.glb` file also loads, but it can't follow your face.
+4. Choose a **World**:
+   - a **Standard** backdrop
+   - a 3D world you upload as a `.glb` file
+   - **Transform my room**, which turns a photo of your room into a stylised flat background. Step out of frame before the 5-second countdown ends.
+5. Press the record button to start and press it again to stop. Recordings stop automatically at 30 seconds.
+6. Add a caption, pick an emoji and a display name, then tap **Post**, or tap **Retake** to try again. It appears in everyone's feed immediately.
 
-Imagine a platform where **anyone can easily create short-form videos as their own virtual human, share their daily lives, and express themselves in a virtual world.**
+### Good to know
 
-## How It Works
-
-When creating a video, users can use a virtual avatar that they have already uploaded.
-
-The system uses sensors and computer vision to track the user's **facial expressions and body movements**, then applies those movements to their virtual avatar in real time.
-
-If a user doesn't have their own avatar, they can simply choose one from the avatars provided by the platform.
-
-### Virtual Backgrounds
-
-Users can also upload their own **3D environments or virtual worlds** as video backgrounds.
-
-For users who don't have a 3D environment, the platform can use AI to transform the **real world into a 3D virtual environment** that matches the visual style of their avatar.
-
-For example, a user could record themselves in their bedroom, and the system could transform the bedroom into a stylized 3D virtual environment that fits the user's virtual character.
-
-## Vision
-
-The ultimate goal is to make virtual-human content creation as easy as creating a normal short-form video.
-
-**No expensive equipment. No complicated 3D software. No advanced technical knowledge.**
-
-Just choose or create your virtual human, record your daily life, and share it with the world.
-
-## What Good Means (For Now)
-
-A successful version of this project is a **social short-form video platform for virtual creators**, where anyone can easily record, share, and watch videos through their virtual avatars.
-
-Users can choose or upload an avatar, record moments from their daily lives as a virtual human, and share them in a video feed where others can watch and interact with their content. The experience should feel as simple and accessible as using TikTok, without requiring expensive equipment, complicated software, or advanced technical knowledge.
-
-For now, the priority is to demonstrate the core experience: **creating a video with a virtual avatar, sharing it with others, and experiencing a social platform where virtual humans can express themselves naturally.**
+- There are no accounts. Your browser is your identity. To use the app on a second device as the same person, open **About → Use on another device**, tap **Show a link code**, and type the code on the other device within 10 minutes.
+- Uploaded avatars and worlds are private to you. Other people only see the videos you post.
+- Body tracking is planned but not built yet. Today only your face drives the avatar.
