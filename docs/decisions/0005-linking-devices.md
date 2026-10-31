@@ -1,6 +1,6 @@
 # 5. Linking devices: one person on two browsers, by a one-time code
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-31
 
 ## Context
