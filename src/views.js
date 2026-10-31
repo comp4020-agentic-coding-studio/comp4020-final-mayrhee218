@@ -137,6 +137,11 @@ export function renderCreate() {
           <button type="button" class="pill ghost small" id="model-delete" hidden>Delete this avatar</button>
         </div>
         <p class="hint" id="model-status" role="status"></p>
+        <label class="switch" id="body-switch">
+          <input type="checkbox" id="body-toggle" />
+          <span>Body tracking <span class="tag">arms + lean, beta</span></span>
+        </label>
+        <p class="hint" id="body-status" role="status"></p>
         <div class="avatar-upload" id="world-upload">
           <label class="pill ghost small">Upload 3D world (.glb)<input type="file" id="world-file" accept=".glb" /></label>
           <button type="button" class="pill ghost small" id="world-delete" hidden>Delete this world</button>

@@ -1,4 +1,18 @@
-import { LIVE_CAMERA, WORLDS, drawAvatarScene, drawCameraScene, faceIn, loadAvatar, loadTracker, loadWorld, track, webglAvailable } from "./avatar.js";
+import {
+  LIVE_CAMERA,
+  WORLDS,
+  drawAvatarScene,
+  drawCameraScene,
+  faceIn,
+  followsBody,
+  loadAvatar,
+  loadBodyTracker,
+  loadTracker,
+  loadWorld,
+  track,
+  trackBody,
+  webglAvailable,
+} from "./avatar.js";
 import { DEFAULT_STYLE, STYLES, portrait, stylise, toJpeg } from "./room.js";
 import { me, save } from "./me.js";
 
@@ -26,6 +40,17 @@ const modelDelete = document.getElementById("model-delete");
 const modelStatus = document.getElementById("model-status");
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
 const MODEL_KEY = "the-space:model";
+
+// Body tracking (docs/body-tracking-plan.md): off until switched on, since the
+// pose model is another ~5 MB and a second tracker every frame is more than
+// some phones can do. Remembered per browser once chosen.
+const bodyToggle = document.getElementById("body-toggle");
+const bodySwitch = document.getElementById("body-switch");
+const bodyStatus = document.getElementById("body-status");
+const BODY_KEY = "the-space:body";
+// Below this many frames a second, sustained, body tracking turns itself off.
+const MIN_FPS = 20;
+const body = { on: false, ready: false, loading: false, pose: null, frames: [], slowSince: null };
 
 // Every avatar on offer, by id: the built-ins from the manifest, then this
 // browser's own uploads, which the server only ever shows to their owner.
@@ -72,9 +97,13 @@ function selectModel() {
   modelStatus.textContent = model.faceTracking
     ? ""
     : "Preview only: this model has no humanoid head, so it can't follow your face.";
-  loadAvatar(model.url).catch((err) => {
-    if (lookSelect.value === model.id) modelStatus.textContent = `${model.name} couldn't load: ${err.message}`;
-  });
+  loadAvatar(model.url)
+    .then(() => {
+      if (lookSelect.value === model.id) updateBodyStatus();
+    })
+    .catch((err) => {
+      if (lookSelect.value === model.id) modelStatus.textContent = `${model.name} couldn't load: ${err.message}`;
+    });
 }
 lookSelect.addEventListener("change", selectModel);
 
@@ -420,6 +449,67 @@ function stopCamera() {
   stream = null;
 }
 
+// What body tracking is doing, in words: the switch alone can't say whether
+// the model can move its arms, or whether anyone is in frame.
+function updateBodyStatus(text) {
+  if (text !== undefined) {
+    bodyStatus.textContent = text;
+    return;
+  }
+  const model = currentModel();
+  if (!body.on) bodyStatus.textContent = "";
+  else if (body.loading) bodyStatus.textContent = "Loading body tracking…";
+  else if (model && followsBody(model.url) === false)
+    bodyStatus.textContent = `${model.name} has no arm bones, so only your face moves it.`;
+  else if (body.ready) bodyStatus.textContent = "Your arms and shoulders move the avatar. Step back so the camera sees your elbows.";
+}
+
+async function setBody(on, { remember = true } = {}) {
+  body.on = on;
+  bodyToggle.checked = on;
+  body.pose = null;
+  body.frames = [];
+  body.slowSince = null;
+  if (remember) {
+    try {
+      localStorage.setItem(BODY_KEY, on ? "on" : "off");
+    } catch {}
+  }
+  updateHint();
+  if (on && !body.ready && !body.loading) {
+    body.loading = true;
+    updateBodyStatus();
+    try {
+      await loadBodyTracker();
+      body.ready = true;
+    } catch {
+      body.on = false;
+      bodyToggle.checked = false;
+      body.loading = false;
+      updateHint();
+      updateBodyStatus("Body tracking couldn't load. Your face still moves the avatar.");
+      return;
+    }
+    body.loading = false;
+  }
+  updateBodyStatus();
+}
+bodyToggle.addEventListener("change", () => setBody(bodyToggle.checked));
+
+// Called every drawn frame while body tracking runs. Too slow for long enough
+// and it switches itself off, saying why, rather than recording a stutter.
+function watchFrameRate(t) {
+  body.frames.push(t);
+  while (body.frames.length && body.frames[0] < t - 1000) body.frames.shift();
+  if (body.frames.length < 2 || t - body.frames[0] < 900) return;
+  const fps = body.frames.length;
+  if (fps >= MIN_FPS) body.slowSince = null;
+  else if ((body.slowSince ??= t) < t - 3000) {
+    setBody(false, { remember: false });
+    updateBodyStatus(`Body tracking switched off: this device managed ${fps} frames a second, and needs ${MIN_FPS}. Face tracking keeps going.`);
+  }
+}
+
 function updateHint() {
   privacyHint.textContent =
     mode === "camera"
@@ -431,6 +521,7 @@ function updateHint() {
           : worldSelect.value === ROOM_PHOTO
           ? "Room photo: your face is tracked on this device. The avatar and your room photo are recorded."
           : "Avatar mode: your face is tracked on this device. Only the avatar is recorded.";
+  if (mode === "avatar" && body.on) privacyHint.textContent = privacyHint.textContent.replace("your face is tracked", "your face and body are tracked");
 }
 
 async function enterLive(next) {
@@ -441,6 +532,8 @@ async function enterLive(next) {
   worldEl.status.hidden = mode !== "avatar";
   document.getElementById("room").hidden = mode !== "avatar";
   modelStatus.hidden = mode !== "avatar";
+  bodySwitch.hidden = mode !== "avatar";
+  bodyStatus.hidden = mode !== "avatar";
   updateHint();
   liveControls.hidden = false;
   uploadControls.hidden = true;
@@ -465,6 +558,13 @@ async function enterLive(next) {
     if (message.textContent.startsWith("Loading") || message.textContent.startsWith("Allow")) say("");
     recordButton.disabled = false;
   }
+  if (mode === "avatar" && !body.on && !body.loading) {
+    let saved = null;
+    try {
+      saved = localStorage.getItem(BODY_KEY);
+    } catch {}
+    if (saved === "on") setBody(true, { remember: false });
+  }
 }
 
 function enterUpload() {
@@ -478,18 +578,24 @@ function enterUpload() {
 
 let lastVideoTime = -1;
 let pose = null;
+let turn = 0; // with both trackers on, they take alternate camera frames
 function frame(t) {
   if (!clip) {
     if (mode === "avatar") {
-      if (trackerReady && camera.currentTime !== lastVideoTime) {
+      const bodyRuns = body.on && body.ready;
+      if (camera.currentTime !== lastVideoTime) {
         lastVideoTime = camera.currentTime;
+        turn++;
         try {
-          pose = track(camera, t);
+          if (bodyRuns && (turn % 2 === 0 || !trackerReady)) body.pose = trackBody(camera, t);
+          else if (trackerReady) pose = track(camera, t);
         } catch {}
       }
+      if (bodyRuns) watchFrameRate(t);
       const backdrop = worldSelect.value === ROOM_PHOTO ? roomBackdrop() : null;
       const world3d = current3dWorld()?.url ?? null;
-      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, backdrop, world3d, camera, t, pose });
+      const arms = bodyRuns ? body.pose : null;
+      drawAvatarScene(ctx, { model: currentModel()?.url, world: worldSelect.value, backdrop, world3d, camera, t, pose, body: arms });
     } else if (mode === "camera") {
       drawCameraScene(ctx, camera);
     }

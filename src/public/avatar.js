@@ -1,9 +1,16 @@
-// The virtual human: a 3D VRM character driven by face tracking, drawn onto a
-// 2D canvas over a world. MediaPipe runs here in the browser, so camera frames
-// never leave the device; only the drawn character is recorded.
+import { solveBody } from "./body.js";
+
+// The virtual human: a 3D VRM character driven by face tracking, and body
+// tracking if it's switched on, drawn onto a 2D canvas over a world. MediaPipe
+// runs here in the browser, so camera frames never leave the device; only the
+// drawn character is recorded.
 const MEDIAPIPE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0";
 const MODEL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+// The lite pose model: the smallest of three, about 5 MB, fetched only when
+// body tracking is first switched on.
+const POSE_MODEL =
+  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 
 // "Live camera (shows you)" draws the real camera, blurred, behind the avatar:
@@ -11,11 +18,21 @@ const MODEL =
 export const LIVE_CAMERA = "Live camera (shows you)";
 export const WORLDS = ["Dusk room", "Neon street", "Cloud sky", LIVE_CAMERA];
 
+// The MediaPipe bundle and its wasm, shared by the face and pose trackers.
+let vision = null;
+async function loadVision() {
+  vision ??= (async () => {
+    const tasks = await import(`${MEDIAPIPE}/vision_bundle.mjs`);
+    return { tasks, fileset: await tasks.FilesetResolver.forVisionTasks(`${MEDIAPIPE}/wasm`) };
+  })();
+  vision.catch(() => (vision = null));
+  return vision;
+}
+
 let landmarker = null;
 export async function loadTracker() {
   if (landmarker) return landmarker;
-  const { FaceLandmarker, FilesetResolver } = await import(`${MEDIAPIPE}/vision_bundle.mjs`);
-  const vision = await FilesetResolver.forVisionTasks(`${MEDIAPIPE}/wasm`);
+  const { tasks: { FaceLandmarker }, fileset } = await loadVision();
   const options = (delegate) => ({
     baseOptions: { modelAssetPath: MODEL, delegate },
     runningMode: "VIDEO",
@@ -23,11 +40,37 @@ export async function loadTracker() {
     outputFaceBlendshapes: true,
   });
   try {
-    landmarker = await FaceLandmarker.createFromOptions(vision, options("GPU"));
+    landmarker = await FaceLandmarker.createFromOptions(fileset, options("GPU"));
   } catch {
-    landmarker = await FaceLandmarker.createFromOptions(vision, options("CPU"));
+    landmarker = await FaceLandmarker.createFromOptions(fileset, options("CPU"));
   }
   return landmarker;
+}
+
+let poser = null;
+export async function loadBodyTracker() {
+  if (poser) return poser;
+  const { tasks: { PoseLandmarker }, fileset } = await loadVision();
+  const options = (delegate) => ({
+    baseOptions: { modelAssetPath: POSE_MODEL, delegate },
+    runningMode: "VIDEO",
+    numPoses: 1,
+  });
+  try {
+    poser = await PoseLandmarker.createFromOptions(fileset, options("GPU"));
+  } catch {
+    poser = await PoseLandmarker.createFromOptions(fileset, options("CPU"));
+  }
+  return poser;
+}
+
+// The upper body, from src/public/body.js: where the arms point and how the
+// chest leans, or null when no one is in frame. Smoothing happens on the
+// bones, in drawCharacter, so this is the raw solve.
+export function trackBody(video, now) {
+  if (!poser || video.readyState < 2) return null;
+  const result = poser.detectForVideo(video, now);
+  return solveBody(result.worldLandmarks?.[0], result.landmarks?.[0]);
 }
 
 // Is there a face in this still image? Used to warn before a room photo with
@@ -202,6 +245,10 @@ async function setup() {
   return three;
 }
 
+// Whether the model at `url`, once loaded, has the arm bones body tracking
+// moves. Null until it has loaded.
+export const followsBody = (url) => (ready.has(url) ? Boolean(ready.get(url).arms) : null);
+
 export const webglAvailable = (() => {
   try {
     return Boolean(document.createElement("canvas").getContext("webgl2"));
@@ -240,7 +287,7 @@ export function loadAvatar(url) {
       const frame = (box.max.y - box.min.y) * 1.25;
       const centre = box.getCenter(new THREE.Vector3()).y - frame * 0.08;
       const tracked = Boolean(vrm?.humanoid?.getNormalizedBoneNode("head"));
-      const loaded = { vrm, scene, centre, frame, tracked };
+      const loaded = { vrm, scene, centre, frame, tracked, arms: vrm ? armRig(THREE, vrm) : null };
       ready.set(url, loaded);
       return loaded;
     })();
@@ -298,6 +345,64 @@ function placeWorld(THREE, world, avatarHeight) {
   w.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale - avatarHeight * 1.5);
 }
 
+// The bones body tracking moves, with each one's rest rotation (arms at the
+// sides, as set above) and the way it points in its own space: toward its
+// child joint, read from the model itself. Reading it, rather than assuming
+// +x, is what lets VRM 0.x, which faces the other way inside, and VRM 1.0
+// both raise the right arm. Null if the model lacks any arm bone, or isn't a
+// VRM, so only face tracking applies.
+function armRig(THREE, vrm) {
+  const bone = (b) => vrm.humanoid?.getNormalizedBoneNode(b) ?? null;
+  const chest = bone("upperChest") ?? bone("chest") ?? bone("spine");
+  const part = (name, child) => {
+    const node = bone(name);
+    const next = bone(child);
+    if (!node || !next || next.position.lengthSq() < 1e-10) return null;
+    return { node, rest: node.quaternion.clone(), axis: next.position.clone().normalize() };
+  };
+  const side = (s) => ({ upper: part(`${s}UpperArm`, `${s}LowerArm`), lower: part(`${s}LowerArm`, `${s}Hand`) });
+  const left = side("left");
+  const right = side("right");
+  if (!chest || !left.upper || !left.lower || !right.upper || !right.lower) return null;
+  return { chest: { node: chest, rest: chest.quaternion.clone() }, left, right };
+}
+
+// Eases every arm bone toward where the body says it points, or back to rest
+// where it wasn't seen. `body` is in scene space (y up, toward the camera +z),
+// and the avatar isn't rotated when tracked, so world and scene agree.
+const SETTLE = 0.35; // per frame: higher follows faster, lower is calmer
+let tmp = null;
+function poseArms(THREE, arms, body) {
+  tmp ??= { q: new THREE.Quaternion(), p: new THREE.Quaternion(), d: new THREE.Quaternion(), v: new THREE.Vector3(), e: new THREE.Euler() };
+  const { q, p, d, v, e } = tmp;
+
+  // Chest: lean and turn as a world rotation, carried into the chest's space.
+  const chest = arms.chest;
+  chest.node.parent.getWorldQuaternion(p);
+  if (body?.found) {
+    d.setFromEuler(e.set(0, -body.twist * 0.6, body.roll * 0.8));
+    q.copy(p).invert().multiply(d).multiply(p).multiply(chest.rest);
+  } else q.copy(chest.rest);
+  chest.node.quaternion.slerp(q, SETTLE);
+  chest.node.updateWorldMatrix(false, false);
+
+  for (const name of ["left", "right"]) {
+    for (const part of ["upper", "lower"]) {
+      const bone = arms[name][part];
+      const target = body?.found ? body[name][part] : null;
+      bone.node.parent.updateWorldMatrix(false, false);
+      if (target) {
+        // Turn the bone so its own axis, seen from the world, points at target.
+        bone.node.parent.getWorldQuaternion(p);
+        v.set(target.x, target.y, target.z).applyQuaternion(p.invert());
+        q.setFromUnitVectors(bone.axis, v);
+      } else q.copy(bone.rest);
+      bone.node.quaternion.slerp(q, SETTLE);
+      bone.node.updateWorldMatrix(false, false);
+    }
+  }
+}
+
 function say(ctx, text, w, h) {
   ctx.fillStyle = "rgb(0 0 0 / 0.45)";
   ctx.fillRect(w * 0.2, h * 0.45, w * 0.6, 56);
@@ -318,7 +423,7 @@ function express(em, names, value) {
   }
 }
 
-function drawCharacter(ctx, url, s, w, h, t, worldUrl = null) {
+function drawCharacter(ctx, url, s, w, h, t, worldUrl = null, body = null) {
   const avatar = ready.get(url);
   if (!avatar || !three) {
     if (!webglAvailable) say(ctx, "3D isn't available here", w, h);
@@ -330,7 +435,7 @@ function drawCharacter(ctx, url, s, w, h, t, worldUrl = null) {
     return;
   }
   const { THREE, renderer, scene, camera } = three;
-  const { vrm, scene: model, centre, frame, tracked } = avatar;
+  const { vrm, scene: model, centre, frame, tracked, arms } = avatar;
   if (shown !== model) {
     if (shown) scene.remove(shown);
     scene.add(model);
@@ -372,6 +477,9 @@ function drawCharacter(ctx, url, s, w, h, t, worldUrl = null) {
     head.rotation.set(pitch * share, yaw * share, roll * share);
     neck?.rotation.set(pitch * 0.4, yaw * 0.4, roll * 0.4);
   }
+  // Arms and chest. With body tracking off, `body` is null and they settle to
+  // rest, so switching it off mid-take eases the arms down rather than freezing.
+  if (arms) poseArms(THREE, arms, body);
   const em = vrm?.expressionManager;
   if (em) {
     // VRM 1.0 names first, then the VRM 0.x presets three-vrm maps them from.
@@ -411,7 +519,8 @@ function drawCharacter(ctx, url, s, w, h, t, worldUrl = null) {
 // of a standard world: a room photo, filtered or AI-styled.
 // `world3d`, if given, is the URL of an uploaded .glb world, drawn in 3D
 // around the avatar instead of any flat background.
-export function drawAvatarScene(ctx, { model, world, backdrop, world3d, camera, t, pose: tracked }) {
+// `body`, if given, is from trackBody: the arms follow it.
+export function drawAvatarScene(ctx, { model, world, backdrop, world3d, camera, t, pose: tracked, body = null }) {
   const { width: w, height: h } = ctx.canvas;
   if (world3d) {
     ctx.fillStyle = "#bfd8f0";
@@ -419,7 +528,7 @@ export function drawAvatarScene(ctx, { model, world, backdrop, world3d, camera, 
     if (worldFailed.has(world3d)) say(ctx, "World couldn't load", w, h * 0.3);
   } else if (backdrop) ctx.drawImage(backdrop, 0, 0, w, h);
   else drawWorld(ctx, world, w, h, t, camera);
-  drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t, world3d && !worldFailed.has(world3d) ? world3d : null);
+  drawCharacter(ctx, model, tracked?.found ? tracked : idle(t), w, h, t, world3d && !worldFailed.has(world3d) ? world3d : null, body);
 }
 
 // Camera mode: the raw camera, cropped to 9:16 and mirrored like a selfie.
