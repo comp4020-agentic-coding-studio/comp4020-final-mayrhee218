@@ -1,298 +1,105 @@
 # Process
 
-## Where This Started (Crit 8)
+## Where This Stands
 
-My idea has always been a short-form video platform for virtual humans: the
-gap I noticed with PLAVE is that virtual artists can't easily share a casual
-selfie moment the way real artists can.
-
-In crit 8 I read Robin Sloan's writing on **"home-cooked apps"** and let it
-pull me the other way. I described the project as **a shared kitchen** —
-between a home-cooked app for a few people and a platform built for millions —
-and deliberately left out feeds, likes, follower counts and discovery. That
-position is in
-[`bc7f2ad`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/bc7f2ad),
-the first definition of good in
-[`03455ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/03455ac),
-and the first proof of life — an emoji avatar, a text "trace", stored on the
-Fly volume — in
-[`6f3f655`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6f3f655).
-
-That scoping got something real deployed in a week. But a page of text notes
-wasn't the product I actually want to make.
-
-## Changing Direction: An Open Video Platform (Crit 9)
-
-This week I went back to the original idea and redefined good in
-[`662b986`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/662b986):
-
-> a **social short-form video platform for virtual creators**, where anyone can
-> easily record, share, and watch videos through their virtual avatars.
-
-The PLAVE gap is about *videos reaching people*. A casual selfie only matters
-if someone sees it, and a feed people can watch and react to is how short-form
-video does that. So the feed, likes and comments I had left out are now part of
-the core experience rather than something to avoid.
-
-What I kept from crit 8 is the scale discipline: build the smallest version of
+The brief asked for a multi-user, real-time website that's good; `README.md`
+defines good here as a **social short-form video platform for virtual
+creators**, as easy to use as TikTok but built at Robin Sloan's
+["home-cooked"](https://www.robinsloan.com/notes/home-cooked-app/) scale:
+people who have the link, not public discovery. That definition has stood
+since crit 9. Crit 8 tried a smaller, feed-less version first — presence and
+text traces only — and I rewrote it once a week of home-cooked reading
+convinced me the gap I actually care about (virtual artists like PLAVE can't
+easily share a casual video) needs a feed, likes and comments to matter at
+all. The scale discipline from crit 8 stayed: build the smallest version of
 each piece that proves the experience, not the whole platform.
 
-## How I Directed the Work
+## The Stack, and Why
 
-I started the week by giving the agent a long architecture prompt for the full
-platform: Next.js, PostgreSQL, Redis queues, S3 and a CDN, FFmpeg transcoding,
-GPU workers for 2D-to-3D, a monorepo with separate services.
+I started crit 9 with an architecture prompt for the full idea: Next.js,
+Postgres, Redis, S3, FFmpeg, GPU workers for 2D-to-3D. None of it fits the
+course deploy — **one shared-CPU machine, 256 MB of memory, one 1 GB volume,
+no database server, no GPU** — so each piece had to move somewhere it could
+actually run:
 
-The agent checked it against the course's fixed deploy setup in `fly.toml`
-before building anything, and much of it doesn't fit: **one shared-CPU machine
-with 256 MB of memory, and one 1 GB volume at `/data`** — no separate database
-server, no object storage, no GPU. It also pointed out that the prompt
-contradicted my crit 8 README.
-
-The agent then misread my answer as dropping the TikTok direction. I corrected
-it: I wanted the TikTok-like open video platform, scaled to fit. From there my
-decisions were:
-
-- **All three ways to make a video:** record as an avatar, record with the
-  camera, or upload a file.
-- **Likes, comments and a live "N here" count** as the social layer for now;
-  follows and profiles wait until there are accounts.
-- **Real-time first:** get the crit 9 contract deployed and green before
-  anything else.
-
-## What I Built, and Why This Way
-
-Each part of the original prompt, mapped onto what this deploy can run:
-
-| The prompt asked for | What I built | Why |
+| Needed | Built as | Why this, not the original plan |
 | --- | --- | --- |
-| Facial tracking + avatar rendering | MediaPipe Face Landmarker **in the browser**, driving a 2D character drawn on a canvas (head turn/tilt, blinks, brows, mouth, smile) | No GPU server needed, low latency, and **camera frames never leave the device** |
-| Recording pipeline | `canvas.captureStream()` + `MediaRecorder`, vertical 540×960, mic audio | Only the drawn avatar is recorded in avatar mode, not the face |
-| Virtual environments | 4 drawn worlds, including an AR world with a blurred camera behind the avatar | A stand-in for uploaded or AI-generated 3D environments |
-| S3 + presigned uploads | Uploads **streamed straight to `/data`**, never held in memory; 25 MB per clip, 850 MB in total | The machine has 256 MB, and the volume is the only storage |
-| Malware/type validation | A file is accepted only if its first bytes are WebM, MP4 or QuickTime, whatever it claims to be | Uploaded files are untrusted |
-| PostgreSQL | One JSON file on `/data`, with serialized writes | No database server is allowed in the course setup |
-| TikTok-style feed | Full-screen swipe feed, autoplay for the clip on screen, the next one preloaded, a right-hand rail, a comments sheet | The experience the README promises |
-| WebSocket for live updates | A `ws` WebSocket at `/live` on the same server | Real-time without WebRTC: nothing here is live media |
+| Facial + body tracking | MediaPipe, **in the browser**, driving a VRM avatar | No GPU server; camera frames never leave the device, which is a privacy property as much as a cost one |
+| Recording | `canvas.captureStream()` + `MediaRecorder` | Only the rendered avatar is captured, not the camera |
+| Video storage | Streamed straight to the Fly volume, 25 MB/clip cap | The machine has 256 MB; nothing paid, nothing in memory |
+| Upload validation | First-bytes check against WebM/MP4/QuickTime | Uploaded files are untrusted regardless of their claimed type |
+| Database | One JSON file on the volume, serialized writes | No separate database server is allowed in the course setup |
+| Real-time | A `ws` WebSocket at `/live` on the same server | No WebRTC needed — nothing here is live media |
 
-The server side is
-[`67d13e5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/67d13e5)
-and the UI and studio are
-[`f98972b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/f98972b).
+Three further decisions shape the rest of the app, recorded as ADRs rather
+than restated here: how presence is shown
+([`docs/decisions/0001`](docs/decisions/0001-presence.md)), how a person is
+told apart from another and who may delete what
+([`docs/decisions/0002`](docs/decisions/0002-who-may-change-what.md)), and how
+uploaded avatars and backgrounds stay 2D or 3D only where that's actually true
+([`docs/decisions/0003`](docs/decisions/0003-your-own-3d-avatar.md),
+[`0004`](docs/decisions/0004-backgrounds-photo-ai-and-3d.md)). A later decision
+replaced sign-in with a device-link code instead of email or passkeys, because
+both need a paid service or an untestable client library
+([`0005`](docs/decisions/0005-linking-devices.md)).
 
-## Real-Time, Red to Green
+## How I Directed the Agent
 
-Crit 9 requires that a change one person makes reaches every other open session
-within about a second, with no reload. I held the agent to that with a test
-in `spec/realtime.test.ts` that runs against the deployed app, written **before**
-the code:
+My role was setting direction and catching what the agent's own reports
+missed, not writing the code. Three patterns repeated:
 
-1. Red:
-   [`867c2ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/867c2ac)
-   — two clients; a trace left by one must reach the other within 1 s, and
-   presence must update when someone arrives or leaves.
-2. Green:
-   [`56b56fa`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/56b56fa)
-   (WebSocket server) and
-   [`3e542f5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/3e542f5)
-   (live page).
-3. When the project became a video platform, I changed the contract instead of
-   keeping a test for a feature that no longer existed. Red again:
-   [`2ce9411`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/2ce9411)
-   — a posted video, a like and a comment must each reach other sessions within
-   1 s, and a file that only *claims* to be a video must be refused.
-4. Green again with the video platform commits above.
+**Constraints over feature lists.** When the agent misread my push-back on the
+original architecture as dropping the TikTok idea entirely, I corrected it:
+scale the idea to fit, don't abandon it. From then on I gave constraints
+(fly.toml's limits, "camera frames never leave the device") rather than a
+feature list, and let the agent propose how to meet them.
 
-## Corrections Along the Way
+**Red before green, against the real contract.** Crit 9's real-time
+requirement and crit 10's permission requirement were each written as a
+failing spec test first —
+[`867c2ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/867c2ac)
+and the permissions tests behind
+[`5faf5ee`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/5faf5ee)
+— run against the broken server before any fix landed, so I could see the
+failure mode I was asking the agent to close, not just trust that it would.
 
-- The tests were green, but the studio was broken in a real browser: a
-  JavaScript ordering bug stopped the create page before it drew anything. The
-  spec only checks the server, so it couldn't see this. A scripted Chrome
-  walkthrough caught it — record an avatar clip, post it, watch it arrive in
-  another tab — and it was fixed before the UI commit.
-- The studio said "only the avatar is recorded", which isn't true in the AR
-  world, where your blurred room is recorded too. The hint now changes with the
-  world you pick.
-- Test runs post clips, so the live app is only checked with tests that don't
-  post anything; the posting tests run in CI against throwaway data, so the feed
-  my pod sees isn't full of test videos.
+**Green tests are not a working page.** Twice, the full spec suite passed
+while the real browser was broken or unsafe: a JavaScript ordering bug froze
+the studio before anything drew, and a CSS rule (`.rail button { display:
+flex }`) showed a delete button to someone who had no right to use it, because
+`hidden` lost to a more specific selector. Neither is visible to a server-only
+test. Both were caught by a scripted two-browser rehearsal, not by `pnpm
+check`, and the fixes
+([`6412c49`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6412c49)
+for the CSS bug) are now something I check by hand before every crit, not
+just something the suite reports green.
 
-## Telling People Apart (Crit 10)
+## Corrections That Landed in the Harness
 
-Crit 10 asks the app to tell people apart, to decide **on the server** what
-each person may see and change, and to log who did what, so I can narrate a
-crit from `flyctl logs` without touching the app.
+Two mistakes changed `CLAUDE.md` or the test suite, not just the code:
 
-### What was wrong before
+- The studio told users "only the avatar is recorded", which was false in the
+  AR background, where the blurred camera is recorded too. The copy now
+  changes with the chosen world, and `CLAUDE.md`'s rule against overclaiming
+  privacy is what caught it on review.
+- My own crit 9 rule said only non-posting tests should run against the live
+  app; the full suite was run against it anyway and left test clips in the
+  real feed before a crit. That's now a rule I check before every deploy
+  rehearsal, not just a one-off fix.
 
-Reading the code against that spec showed the server believed whatever a
-request said about who sent it. The name and avatar came in the request body,
-and a like was keyed by a `clientId` the page made up. Anyone could post under
-anyone's name, and one browser could like a video as many times as it had ids
-to send. Nothing could be deleted, so there was no "yours" to protect.
+An owner role (handles in `OWNER_HANDLES` can delete anything, logged as
+`[OWNER]`) was built and tested but deliberately left switched off on the live
+deploy — decision 0005 keeps "a person is a browser" as the only identity
+model for now, so nobody is an owner unless I configure one locally.
 
-### The decision
+## Known Limits and Next
 
-The full record is `docs/decisions/0002-who-may-change-what.md`. In short:
-
-- **A person is a browser.** On the first visit the server sets an
-  `HttpOnly` cookie with a random 128-bit token. That cookie is the only proof
-  of who you are. Everyone else sees a **handle**, a hash of the token, on what
-  you post. Seeing someone's handle doesn't let you act as them.
-- **Name and avatar are labels, not identity.** Two people can both be "mia";
-  the handle tells them apart.
-- **Only owners delete.** A video can be deleted only by its poster. A comment
-  can be deleted by its writer or by the poster of the video it's under. A
-  like counts once per person. Who liked a video stays private.
-
-I chose an anonymous browser over accounts because my pod gets only the URL:
-each Chrome profile becomes a separate person with no sign-up step, the way
-TikTok lets you watch without an account.
-
-### Red to green
-
-I wrote `spec/permissions.test.ts` before changing the server and ran it
-against the old one: all four tests failed because no identity cookie was
-handed out. They check that two browsers get different handles, that a
-stranger's delete is refused with `403`, that a comment's writer and the
-video's poster can both delete it, and that a browser's like counts once
-whatever id it claims. The identity, the rules and the tests landed together
-in [`5faf5ee`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/5faf5ee). The red run happened locally, not as its own
-commit.
-
-The page hides delete buttons you can't use, but that's only manners: the
-`403` comes from the server either way, which is what the tests check.
-
-### Logging who did what
-
-[`6171c3f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6171c3f) prints one line per action, led by the person's
-name, avatar and handle, and naming whose video was touched:
-
-```
-kai🐧#cdc_xHODhY liked video 4dcd8d61 (mia🦊#QzgBhugnct's) → 1 like
-kai🐧#cdc_xHODhY REFUSED delete video 4dcd8d61 (mia🦊#QzgBhugnct's)
-mia🦊#QzgBhugnct deleted video 4dcd8d61 "first try"
-```
-
-Posts, likes, comments, deletes, refused deletes, failed uploads, arrivals
-and departures are all logged. Only the public handle is printed, never the
-cookie token, so the log is safe to put on screen at the crit. The logging
-stays after the crit: it's what I'll read when the deployed app misbehaves.
-
-### Corrections along the way
-
-- **Likes and deletes carry no name**, so their log lines first showed a bare
-  handle. The server now remembers the last name each handle used, so those
-  lines read as a person.
-- **A restart would have forgotten every name.** The name list is now seeded
-  from the stored videos and comments at boot.
-- **Test clients with no cookie logged as "nobody"**, which reads like a bug
-  at a crit. They now show as `(no cookie)`. A real browser always has a
-  cookie.
-- **I broke my own rule about the live feed.** To check the deploy, the full
-  spec ran against the live URL, and it posts test clips, captioned `spec-…`.
-  The crit 9 section above says only tests that don't post should run against
-  the live app. Those clips have to be cleared before my pod opens the feed.
-- **The rehearsal caught what the spec couldn't.** I ran the crit's script in
-  two isolated Chrome contexts, with separate cookies standing in for two
-  profiles, against a local copy with throwaway data. Mia posted, Kai
-  commented and liked, Kai forged a second like and a delete by hand, and Mia
-  deleted her clip. The server side held: the forged like left the count at 1,
-  the delete got a `403` and a `REFUSED` line, and the clip vanished from
-  Kai's feed live. The page didn't hold. **Kai saw a delete button on Mia's
-  clip**, because the CSS rule `.rail button { display: flex }` beat the
-  `hidden` attribute. Every page also threw an error when the empty-feed
-  placeholder, which has no delete button, got the same treatment. All the
-  spec tests were green throughout, because they check the server over HTTP
-  and never render a page. Both bugs are fixed and the rehearsal reruns clean.
-  It's the crit 9 lesson again: green tests are not a working page. The fix is
-  [`6412c49`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/6412c49).
-
-## After Crit 10: Working Through "Next"
-
-At the end of crit 10, my "Next" list had three items: a sign-in, an owner
-role, and a 3D avatar.
-
-### A 3D avatar was already done
-
-The 3D avatar landed before I came back to this list, so its line was out of
-date. The drawn 2D character became three built-in VRM models in
-[`99a2cfc`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/99a2cfc),
-which drive every expression a model has
-([`2730493`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/2730493)).
-People can upload their own `.vrm`, checked on the server and kept private
-([`f8cab83`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/f8cab83),
-decision 0003), and stand it inside an uploaded 3D world
-([`7b6c914`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-mayrhee218/commit/7b6c914),
-decision 0004). Body tracking is still only a plan, in
-`docs/body-tracking-plan.md`.
-
-### Sign-in became a device link code
-
-Decision 0002 said a sign-in by email link or passkey would let a person keep
-their videos across devices. Looking at each:
-
-- **An email link** needs a paid email provider and an API key. My CLAUDE.md
-  says a paid service needs my approval, and my pod would need real email
-  addresses at a crit.
-- **A passkey** adds a library on both sides and can't be tested from `spec/`
-  over plain HTTP.
-
-I chose a **device link code** instead. The browser you already use shows a
-one-time code, valid for ten minutes. Typing it on the other device gives that
-browser the same identity token, so the handle carries over, which is what
-decision 0002 asked for. It needs no new dependency and no outside service,
-and it's tested end to end. It doesn't solve recovery: if you lose every
-linked browser, you're gone.
-
-Linking is recorded in `docs/decisions/0005-linking-devices.md`, and its
-contract is in `spec/devices-and-owners.test.ts`.
-
-### An owner role, built but left off
-
-The agent also built an owner role: handles listed in `OWNER_HANDLES` can
-delete any video or comment, and each use is logged as an `[OWNER]` line. I
-decided to leave it out of decision 0005 and keep it switched off. Nothing
-sets `OWNER_HANDLES` on the deploy, so on the live app nobody is an owner and
-the rules are still the ones in decision 0002. Its tests need an app started
-with a known owner, so CI skips them; they passed locally against an app
-started with a test owner.
-
-I also checked the pages in a real browser, with three separate browser
-contexts:
-
-- Before linking, the phone had no delete button on the laptop's clip; after
-  linking, it did.
-- With the role switched on locally, the owner saw delete on every clip, and
-  when they removed one, the laptop's feed said it was removed "by the app's
-  owner".
-
-That check also caught a layout problem the tests couldn't: a fourth button in
-the bottom nav pushed **＋** off centre. The link page moved to the About page
-instead.
-
-## Known Limits
-
-- **A person is a browser, not a human.** Clearing cookies makes you someone
-  new. A link code can make two browsers one person, but nothing can recover
-  an identity whose browsers are all gone.
-- **Linking can't be undone.** A linked browser stays you until its cookie is
-  cleared.
-- **No moderation.** You can delete your own things, but nobody can remove
-  someone else's video, and posts from before crit 10 can't be deleted at
-  all. The owner role that would fix this exists but is switched off.
-- **Face-only tracking.** The avatar is a 3D VRM, but only the face drives
-  it: body tracking is planned, not built. Webcam tracking is not professional
-  motion capture.
-- **No 2D-to-3D conversion.** A room photo stays a flat background, and AI
-  restyling only works if a provider is configured.
-- **No transcoding.** Clips play in the format they were recorded in (WebM, or
-  MP4 from Safari).
-- **Face tracking has only been tested with a fake camera so far.** It needs
-  testing on real phones and webcams.
-
-## Next
-
-- Body tracking for the upper body, following `docs/body-tracking-plan.md`.
-- A passkey as a way to recover an identity, alongside the link code.
-- Testing face tracking and recording on real phones.
+A person is a browser, not a human: clearing cookies makes you someone new,
+and a link code joins two browsers but can't recover a lost identity. There's
+no moderation beyond deleting your own posts. Tracking is face- and
+upper-body-only, webcam-grade, not professional motion capture — body
+tracking follows `docs/body-tracking-plan.md` and ships behind a beta switch.
+A room photo stays a flat 2D background; it is never called 3D. Next: finish
+testing face and body tracking on real phones (so far only a fake camera), and
+look at a passkey as a second way to recover an identity alongside the link
+code.
