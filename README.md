@@ -2,14 +2,24 @@
 
 A short-form video platform where anyone can record and share moments from their daily life as a virtual human. All you need is a webcam or phone camera.
 
+<p align="center">
+  <img src="src/public/readme/demo.gif" width="260" alt="Scrolling the feed, then switching avatar and world in the studio and recording" />
+</p>
+
+| Feed | Studio | Comments |
+| :---: | :---: | :---: |
+| <img src="src/public/readme/feed.png" width="220" alt="The feed with a Cool Banana clip" /> | <img src="src/public/readme/studio.png" width="220" alt="The studio with body tracking on" /> | <img src="src/public/readme/comments.png" width="220" alt="Comments on a clip" /> |
+
+*Test camera: avatars idle, not tracking.*
+
 ## What “Good” Means for This App
 
 Good means a **social short-form video platform for virtual creators** that feels as easy as TikTok.
 
-- **Simple.** A beginner can choose an avatar, record and post a video in under a minute, without reading instructions or installing anything.
-- **Genuinely functional.** Every button does what it says. The avatar follows your face only when the model really supports it. A restyled room photo is labelled as a flat 2D picture, not a 3D world, and an on-device colour filter is never called “AI”.
+- **Simple.** A beginner can choose an avatar, record and post in under a minute, with nothing to install.
+- **Genuinely functional.** Every button does what it says. The avatar follows you only when the model supports it. A restyled room photo is labelled as a flat 2D picture, not a 3D world, and an on-device colour filter is never called “AI”.
 - **Private by default.** Face and body tracking run in your browser, so only the avatar is recorded and camera frames never leave your device. A room photo goes to an AI service only with your consent, photo by photo.
-- **Social and live.** Two or more people share one feed. New videos, likes and comments reach everyone else within about a second without a reload. You can see who is here right now.
+- **Social and live.** People share one feed. New videos, likes and comments reach everyone within about a second, without a reload. You see who is here now.
 - **Fair and lasting.** The server, not the browser, decides who may change what: only you can delete your own videos and avatars, and each person can like a video only once. Posted videos survive reloads, restarts and redeploys.
 
 When these conflict, privacy and user data come first, and visual polish comes last.
