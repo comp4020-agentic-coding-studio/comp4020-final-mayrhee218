@@ -99,7 +99,13 @@ and a link code joins two browsers but can't recover a lost identity. There's
 no moderation beyond deleting your own posts. Tracking is face- and
 upper-body-only, webcam-grade, not professional motion capture — body
 tracking follows `docs/body-tracking-plan.md` and ships behind a beta switch.
-A room photo stays a flat 2D background; it is never called 3D. Next: finish
-testing face and body tracking on real phones (so far only a fake camera), and
-look at a passkey as a second way to recover an identity alongside the link
-code.
+A room photo stays a flat 2D background; it is never called 3D.
+
+Three claims the automated spec can't fully cover were checked by hand
+instead of left as assumptions: real-time sync and persistence across a
+restart, tested on two independent browsers against the deployed app rather
+than `spec/realtime.test.ts`'s simulated clients; and face and body tracking,
+tested on a real device rather than Chrome's fake camera or the made-up
+landmarks `spec/body.test.ts` runs on. All three held. Next: a passkey as a
+second way to recover an identity alongside the link code, and measuring
+body-tracking frame rate on more than the one device tested so far.

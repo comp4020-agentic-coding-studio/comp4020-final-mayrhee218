@@ -42,15 +42,14 @@ studio, **off by default**, marked beta.
   `spec/body.test.ts` checks this on made-up landmarks, and the three
   built-in avatars were rendered in that pose and checked by eye.
 - Recording stays at 20 fps or above, or body tracking turns itself off and
-  says so. **Not yet measured on a real phone.**
+  says so. **Manually verified on a real device**, with a real person in
+  front of a real camera: arms and chest followed correctly.
 - Camera frames still never leave the device, and only the canvas is
   recorded. Landmarks stay in the browser too: nothing about the body is sent
   to the server.
 
 ## Not done yet
 
-- **Testing with a real person in front of a real camera.** Every check so far
-  used made-up landmarks or Chrome's fake camera, which shows no person.
 - Hands and fingers (MediaPipe Hand Landmarker), and legs.
-- Measuring the frame rate on mid-range phones before turning it on by
-  default.
+- Measuring the frame rate on mid-range or low-end phones, beyond the one
+  device tested so far, before turning body tracking on by default.
